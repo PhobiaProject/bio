@@ -165,10 +165,18 @@ function makePiece(kind,materialOverride=null){
 }
 function makeGhost(){if(ghost)scene.remove(ghost);ghost=makePiece(buildPiece,new THREE.MeshStandardMaterial({color:0x7dbe83,transparent:true,opacity:.42,roughness:1}));ghost.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.material.transparent=true;o.material.opacity=.38;o.material.depthWrite=false}});scene.add(ghost)}
 function buildPosition(){
- const distance=5;const fx=player.x-Math.sin(player.yaw)*distance,fz=player.z+Math.cos(player.yaw)*distance;
- return {x:Math.round(fx/3)*3,z:Math.round(fz/3)*3,yaw:Math.round(player.yaw/(Math.PI/2))*(Math.PI/2)};
+ // The build preview must be in front of the player, using the same forward axis as WASD.
+ const distance=5;
+ const fx=player.x-Math.sin(player.yaw)*distance;
+ const fz=player.z-Math.cos(player.yaw)*distance;
+ // Snap to the construction grid, with a stable 90-degree rotation.
+ return {
+   x:Math.round(fx/3)*3,
+   z:Math.round(fz/3)*3,
+   yaw:Math.round(player.yaw/(Math.PI/2))*(Math.PI/2)
+ };
 }
-function updateGhost(){if(!buildMode||!ghost)return;const pos=buildPosition();ghost.position.set(pos.x,buildPiece==='wall'||buildPiece==='doorframe'||buildPiece==='door'||buildPiece==='stairs'?0:0,pos.z);ghost.rotation.set(0,pos.yaw+buildRotation*Math.PI/2,0);let valid=true;const dist=Math.hypot(pos.x-player.x,pos.z-player.z);if(dist<2.5||dist>9)valid=false;if(buildPiece==='upgrade')valid=builtParts.some(b=>Math.hypot(b.position.x-pos.x,b.position.z-pos.z)<1.8);ghost.traverse(o=>{if(o.isMesh)o.material.color.set(valid?0x79d58b:0xe35e4c)});}
+function updateGhost(){if(!buildMode||!ghost)return;const pos=buildPosition();ghost.position.set(pos.x,0,pos.z);ghost.rotation.set(0,pos.yaw+buildRotation*Math.PI/2,0);let valid=true;const dist=Math.hypot(pos.x-player.x,pos.z-player.z);if(dist<2.5||dist>9)valid=false;if(buildPiece==='upgrade')valid=builtParts.some(b=>Math.hypot(b.position.x-pos.x,b.position.z-pos.z)<1.8);ghost.traverse(o=>{if(o.isMesh)o.material.color.set(valid?0x79d58b:0xe35e4c)});}
 function placeBuildPiece(){
  if(!buildMode||!ghost)return;
  const pos=buildPosition();const cost=pieceCosts[buildPiece]||{};
@@ -180,7 +188,7 @@ function placeBuildPiece(){
   player.stone-=150;nearest.traverse(o=>{if(o.isMesh)o.material=mat(0x777b79)});nearest.userData.tier='stone';say('Постройка улучшена до камня');ui();return;
  }
  if(player.wood<(cost.wood||0)){say('Не хватает дерева');return}
- const dist=Math.hypot(pos.x-player.x,pos.z-player.z);if(dist<2.5||dist>9){say('Слишком близко или далеко для строительства');return}
+ const dist=Math.hypot(pos.x-player.x,pos.z-player.z);if(dist<2.5||dist>8){say('Слишком близко или далеко для строительства');return}
  // Avoid placing identical pieces on top of each other.
  if(builtParts.some(b=>Math.hypot(b.position.x-pos.x,b.position.z-pos.z)<.65&&b.userData.kind===buildPiece)){say('Здесь уже есть такой элемент');return}
  player.wood-=cost.wood||0;
@@ -221,4 +229,4 @@ requestAnimationFrame(animate);
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 ui();
 </script>
-</body></html>
+</body></html> 
