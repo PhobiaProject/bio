@@ -1,792 +1,160 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>Platform Fighter — Arena Prototype</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WILDLANDS — Rust-inspired Survival</title>
 <style>
-  html,body{margin:0;padding:0;background:#0a0a12;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',Arial,sans-serif}
-  #wrap{position:relative}
-  canvas{display:block;border-radius:8px;box-shadow:0 0 60px rgba(80,40,160,.45), 0 0 0 1px #2a2a3a}
-  #hint{position:absolute;bottom:-28px;width:100%;text-align:center;font-size:12px;color:#667;text-shadow:0 1px 2px #000}
+:root{--panel:rgba(13,15,15,.76);--line:rgba(205,190,160,.28);--text:#eee9df;--muted:#b9b1a3;--orange:#c45d36}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101514;color:var(--text);font-family:Arial,Helvetica,sans-serif}canvas{display:block}#game{position:fixed;inset:0}#hud{position:fixed;inset:0;pointer-events:none;text-shadow:0 2px 4px #000}
+.top{position:absolute;top:18px;left:18px;display:flex;gap:8px;align-items:center}.brand{font-size:13px;letter-spacing:.18em;font-weight:900;background:var(--panel);border:1px solid var(--line);padding:10px 13px;border-radius:2px;text-transform:uppercase}.status{font-size:12px;color:#d5dfd9;background:var(--panel);padding:10px 12px;border-radius:5px;border:1px solid var(--line)}
+.stats{position:absolute;left:18px;bottom:18px;width:min(290px,calc(100vw - 36px));display:grid;gap:7px}.stat{background:var(--panel);border:1px solid var(--line);padding:8px 10px;border-radius:4px;display:grid;grid-template-columns:74px 1fr 34px;gap:8px;align-items:center;font-size:11px;letter-spacing:.08em}.bar{height:7px;background:#303a39;border-radius:2px;overflow:hidden}.fill{height:100%;width:100%;background:#76aa80;transition:width .2s}.stat:nth-child(2) .fill{background:#d4a75e}.stat:nth-child(3) .fill{background:#6ca9d0}
+.crosshair{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:18px;height:18px}.crosshair:before,.crosshair:after{content:"";position:absolute;background:#e6e3d9;box-shadow:0 0 3px #000}.crosshair:before{width:2px;height:18px;left:8px}.crosshair:after{height:2px;width:18px;top:8px}
+.center-msg{position:absolute;top:58%;left:50%;transform:translateX(-50%);font-size:12px;color:#fff;background:rgba(0,0,0,.5);padding:7px 12px;border-radius:4px;white-space:nowrap}.right{position:absolute;right:18px;top:18px;width:190px;background:var(--panel);border:1px solid var(--line);padding:12px;border-radius:5px}.right h3{font-size:11px;letter-spacing:.15em;margin:0 0 10px;color:var(--orange)}.resource{display:flex;justify-content:space-between;font-size:12px;padding:5px 0;color:#e6e6df}.resource span:last-child{font-variant-numeric:tabular-nums}
+.hotbar{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:5px}.slot{width:58px;height:60px;background:rgba(20,22,21,.82);border:1px solid rgba(215,205,185,.32);border-radius:1px;display:flex;flex-direction:column;justify-content:space-between;padding:5px;font-size:10px;color:#d9dfdc}.slot.active{border:2px solid #d18b3e;background:rgba(54,69,72,.94);box-shadow:inset 0 0 0 1px #000}.slot b{font-size:18px;font-weight:500}.slot small{text-align:right;color:#fff}
+.help{position:absolute;right:18px;bottom:18px;text-align:right;font-size:11px;color:#d1d8d3;line-height:1.7}.help kbd{background:#111b1a;border:1px solid #66716b;border-radius:3px;padding:2px 5px;color:white}
+.overlay{position:fixed;inset:0;display:grid;place-items:center;background:linear-gradient(180deg,rgba(8,15,17,.6),rgba(7,12,13,.85));z-index:5}.menu{width:min(540px,calc(100vw - 32px));padding:30px;background:rgba(12,19,19,.92);border:1px solid rgba(255,255,255,.2);box-shadow:0 25px 100px #0008}.eyebrow{color:var(--orange);font-size:11px;letter-spacing:.28em;font-weight:800}.menu h1{font-size:clamp(34px,7vw,58px);line-height:.95;letter-spacing:-.05em;margin:14px 0}.menu p{color:#c1cbc6;line-height:1.6;font-size:14px}.menu button{border:0;background:var(--orange);color:#17120d;font-weight:900;letter-spacing:.12em;padding:14px 18px;margin-top:10px;cursor:pointer;width:100%}.menu button:hover{filter:brightness(1.1)}.note{font-size:11px!important;color:#87938e!important}
+#toast{position:absolute;top:78px;left:50%;transform:translateX(-50%);background:rgba(10,15,15,.9);padding:10px 16px;border:1px solid var(--line);border-radius:4px;font-size:12px;opacity:0;transition:opacity .2s}
+@media(max-width:650px){.right{top:auto;bottom:100px;right:10px;width:140px;padding:8px}.top{top:10px;left:10px;gap:4px}.brand,.status{padding:8px;font-size:10px}.help{display:none}.slot{width:43px;height:49px}.stats{left:10px;bottom:10px;width:180px}.stat{grid-template-columns:54px 1fr 26px;padding:6px;font-size:9px}.hotbar{bottom:10px;left:auto;right:10px;transform:none}}
+
+.inventory-panel{position:fixed;inset:0;z-index:6;display:none;place-items:center;background:rgba(4,7,7,.78);backdrop-filter:blur(4px)}
+.inventory-window{width:min(820px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;background:#171a18;border:1px solid #817966;padding:18px;box-shadow:0 24px 90px #000a}
+.inventory-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #554f44;padding-bottom:12px;margin-bottom:14px}
+.inventory-head h2{margin:0;font-size:20px;letter-spacing:.14em}
+.inventory-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.panel-block{border:1px solid #514d43;padding:12px;background:#151918}
+.panel-block h3{margin:0 0 10px;color:#c45d36;font-size:11px;letter-spacing:.2em}
+.item-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.item-cell{aspect-ratio:1;background:#272b28;border:1px solid #514f46;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:11px;color:#e8e1d4}.item-cell b{font-size:23px;font-weight:400}
+.recipe{display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid #393b35;padding:10px 0;font-size:12px}.recipe button,.close-inventory{border:1px solid #a66a42;background:#9e4c2d;color:#fff0df;padding:8px 10px;font-weight:800;cursor:pointer}.recipe button:disabled{opacity:.35;cursor:not-allowed}.inv-note{font-size:11px;color:#a9ada5;line-height:1.5}
+@media(max-width:650px){.inventory-grid{grid-template-columns:1fr}.inventory-window{padding:10px}}
 </style>
 </head>
 <body>
-<div id="wrap">
-  <canvas id="game" width="1280" height="720"></canvas>
-  <div id="hint">P1: WASD + J/K&nbsp;&nbsp;|&nbsp;&nbsp;P2: Стрелки + O/P&nbsp;&nbsp;|&nbsp;&nbsp;Вниз+Прыжок — провал&nbsp;&nbsp;|&nbsp;&nbsp;Enter — рестарт</div>
+<div id="game"></div>
+<div id="hud">
+  <div class="top"><div class="brand"><span style="color:var(--orange)">▧</span> WILDLANDS</div><div class="status" id="day">ДЕНЬ 1 · 08:00</div></div><div id="compass" style="position:absolute;top:18px;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:.32em;color:#f1eee6;background:rgba(10,13,13,.35);padding:7px 18px;border-bottom:1px solid #d2c6ad66">NW&nbsp;&nbsp;  N&nbsp;&nbsp;  NE&nbsp;&nbsp;  E&nbsp;&nbsp;  SE</div>
+  <div class="crosshair"></div><div class="center-msg" id="prompt">Нажми «Начать» и исследуй остров</div>
+  <div class="right"><h3>РЕСУРСЫ / INVENTORY</h3><div class="resource">🪵 Дерево <span id="wood">0</span></div><div class="resource">🪨 Камень <span id="stone">0</span></div><div class="resource">⛓ Металл <span id="metal">0</span></div><div class="resource">🍓 Еда <span id="food">3</span></div></div>
+  <div class="stats">
+    <div class="stat"><span>ЗДОРОВЬЕ</span><div class="bar"><div class="fill" id="healthbar"></div></div><b id="health">100</b></div>
+    <div class="stat"><span>ГОЛОД</span><div class="bar"><div class="fill" id="hungerbar"></div></div><b id="hunger">100</b></div>
+    <div class="stat"><span>ЖАЖДА</span><div class="bar"><div class="fill" id="thirstbar"></div></div><b id="thirst">100</b></div>
+  </div>
+  <div class="hotbar" id="hotbar"><div class="slot active"><span>1</span><b>🪓</b><small>Топор</small></div><div class="slot"><span>2</span><b>⛏</b><small>Кирка</small></div><div class="slot"><span>3</span><b>🏗</b><small>Стройка</small></div><div class="slot"><span>4</span><b>🍓</b><small>Еда</small></div><div class="slot"><span>5</span><b>💧</b><small>Вода</small></div></div>
+  <div class="help"><kbd>W A S D</kbd> ДВИЖЕНИЕ · <kbd>SHIFT</kbd> БЕГ<br><kbd>ЛКМ</kbd> УДАР / ДОБЫЧА · <kbd>E</kbd> ИСПОЛЬЗОВАТЬ<br><kbd>1–5</kbd> СЛОТЫ · <kbd>ESC</kbd> МЕНЮ</div>
+  <div id="toast"></div>
 </div>
-<script>
-"use strict";
 
-/* ============================================================
-   КОНСТАНТЫ
-============================================================ */
-const W = 1280, H = 720;
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-
-const PHYS = {
-  gravity: 2600, moveSpeed: 420, airAccel: 2200, groundAccel: 6000,
-  groundFriction: 3200, airFriction: 200, jumpVel: 950, doubleJumpVel: 850,
-  fastFallVel: 1500, maxFall: 1100,
-  blastLeft: -80, blastRight: W + 80, blastTop: -160, blastBottom: H + 100
-};
-const ATTACKS = {
-  light: { startup:0.05, active:0.09, endlag:0.18, damage:6,  baseKB:260, kbGrowth:7,  angle:38, range:70, size:34, hitstop:0.06, color:"#ffe45e" },
-  heavy: { startup:0.26, active:0.11, endlag:0.42, damage:14, baseKB:430, kbGrowth:12, angle:45, range:88, size:52, hitstop:0.12, color:"#ff7a3c" }
-};
-const MAX_DMG = 999, START_STOCKS = 3, MAX_PARTICLES = 500;
-
-/* ============================================================
-   БЫСТРЫЕ СПРАЙТЫ СВЕЧЕНИЯ (вместо тяжёлого shadowBlur)
-============================================================ */
-function hexRgb(hex){
-  const n = parseInt(hex.slice(1), 16);
-  return [n>>16 & 255, n>>8 & 255, n & 255];
+<div class="inventory-panel" id="inventoryPanel"><div class="inventory-window">
+<div class="inventory-head"><h2>ИНВЕНТАРЬ / КРАФТ</h2><button class="close-inventory" id="closeInventory">ЗАКРЫТЬ [TAB]</button></div>
+<div class="inventory-grid">
+<div class="panel-block"><h3>СОДЕРЖИМОЕ РЮКЗАКА</h3><div class="item-grid">
+<div class="item-cell"><b>🪵</b>Дерево <strong id="invWood">0</strong></div><div class="item-cell"><b>🪨</b>Камень <strong id="invStone">0</strong></div>
+<div class="item-cell"><b>⛓</b>Металл <strong id="invMetal">0</strong></div><div class="item-cell"><b>🍓</b>Ягоды <strong id="invFood">3</strong></div>
+<div class="item-cell"><b>💧</b>Вода <strong id="invWater">2</strong></div><div class="item-cell"><b>🪓</b>Топор <small>инструмент</small></div>
+<div class="item-cell"><b>🏹</b>Лук <small>оружие</small></div><div class="item-cell"><b>🏗</b>План <small>стройка</small></div>
+</div><p class="inv-note">Собирай ресурсы и создавай предметы. Постройки появятся перед персонажем.</p></div>
+<div class="panel-block"><h3>РЕЦЕПТЫ</h3>
+<div class="recipe"><span>🏹 Примитивный лук<br><small>50 дерева · 10 камня</small></span><button id="craftBow">СОЗДАТЬ</button></div>
+<div class="recipe"><span>🏠 Деревянный фундамент<br><small>50 дерева</small></span><button id="craftFloor">СОЗДАТЬ</button></div>
+<div class="recipe"><span>🧱 Стена<br><small>30 дерева · 40 камня</small></span><button id="craftWall">СОЗДАТЬ</button></div>
+<div class="recipe"><span>🔥 Костёр<br><small>25 дерева · 5 камня</small></span><button id="craftFire">СОЗДАТЬ</button></div>
+</div></div></div></div>
+<div class="overlay" id="overlay"><div class="menu"><div class="eyebrow">ISLAND • SURVIVAL • BUILD</div><h1>ВЫЖИВАНИЕ<br>НАЧИНАЕТСЯ.</h1><p>Ты один на суровом острове. Добывай дерево и камень, ищи припасы, следи за голодом и жаждой. Построй первое укрытие до наступления темноты.</p><p class="note">Браузерный survival-прототип · WASD / мышь · рекомендуется играть на компьютере</p><button id="start">НАЧАТЬ ВЫЖИВАНИЕ</button></div></div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+const root=document.querySelector('#game');
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x9aafb1); scene.fog=new THREE.Fog(0x9aafb1,28,95);
+const camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,.1,220); camera.position.set(0,2,8);
+const renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; renderer.outputColorSpace=THREE.SRGBColorSpace; root.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xd5dfdc,0x373a2c,1.45));
+const sun=new THREE.DirectionalLight(0xffd7a0,2.65);sun.position.set(-35,55,25);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-55;sun.shadow.camera.right=55;sun.shadow.camera.top=55;sun.shadow.camera.bottom=-55;scene.add(sun);
+const mat=(color,roughness=1)=>new THREE.MeshStandardMaterial({color,roughness});
+const grass=mat(0x536544), sand=mat(0x9e8b68), trunk=mat(0x4c3424), leaves=[mat(0x233e2d),mat(0x2d4d34),mat(0x3a5638)], rockMat=mat(0x686b67), metalMat=mat(0x4c5d60), waterMat=new THREE.MeshStandardMaterial({color:0x3e7780,roughness:.32,metalness:.18});
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(220,220,1,1),grass);ground.rotation.x=-Math.PI/2;ground.position.y=-.12;ground.receiveShadow=true;scene.add(ground);
+const sea=new THREE.Mesh(new THREE.PlaneGeometry(500,500),waterMat);sea.rotation.x=-Math.PI/2;sea.position.y=-1.2;scene.add(sea);
+const beach=new THREE.Mesh(new THREE.RingGeometry(29,37,96),sand);beach.rotation.x=-Math.PI/2;beach.position.y=-.09;scene.add(beach);
+const collidables=[];
+const detailMats=[mat(0x6f7747),mat(0x83805a),mat(0x4c5b39)];
+for(let i=0;i<520;i++){
+  const a=Math.random()*Math.PI*2, r=4+Math.random()*31;
+  const x=Math.cos(a)*r,z=Math.sin(a)*r;
+  if(r>34) continue;
+  const tuft=new THREE.Group();
+  for(let j=0;j<3;j++){
+    const blade=new THREE.Mesh(new THREE.ConeGeometry(.035+Math.random()*.025,.24+Math.random()*.35,3),detailMats[j%3]);
+    blade.position.set((Math.random()-.5)*.16,.12,(Math.random()-.5)*.16);
+    blade.rotation.z=(Math.random()-.5)*.6; tuft.add(blade);
+  }
+  tuft.position.set(x,0,z); tuft.rotation.y=Math.random()*Math.PI;
+  scene.add(tuft);
 }
-const glowCache = {};
-function glowSprite(color){
-  if (glowCache[color]) return glowCache[color];
-  const [r, g, b] = hexRgb(color);
-  const c = document.createElement("canvas");
-  c.width = c.height = 96;
-  const g2 = c.getContext("2d");
-  const grad = g2.createRadialGradient(48, 48, 2, 48, 48, 48);
-  grad.addColorStop(0, "rgba(255,255,255,0.95)");
-  grad.addColorStop(0.3, color);
-  grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
-  g2.fillStyle = grad;
-  g2.fillRect(0, 0, 96, 96);
-  glowCache[color] = c;
-  return c;
+function addTree(x,z,s=1){const g=new THREE.Group();g.position.set(x,0,z);g.scale.setScalar(s);
+ const t=new THREE.Mesh(new THREE.CylinderGeometry(.22,.34,2.8,7),trunk);t.position.y=1.35;t.castShadow=true;g.add(t);
+ for(let i=0;i<3;i++){const c=new THREE.Mesh(new THREE.ConeGeometry(1.25-i*.18,2.2,7),leaves[(Math.random()*leaves.length)|0]);c.position.y=2.4+i*.72;c.castShadow=true;g.add(c)}
+ scene.add(g);collidables.push({obj:g,type:'tree',x,z,r:1.1*s,hp:3});}
+function addRock(x,z,s=1,metal=false){const mesh=new THREE.Mesh(new THREE.DodecahedronGeometry(.75*s,0),metal?metalMat:rockMat);mesh.position.set(x,.45*s,z);mesh.scale.set(1.2,.75,.9);mesh.rotation.set(Math.random(),Math.random()*3,Math.random());mesh.castShadow=true;mesh.receiveShadow=true;scene.add(mesh);collidables.push({obj:mesh,type:metal?'metal':'rock',x,z,r:.8*s,hp:2});}
+for(let i=0;i<135;i++){let a=Math.random()*Math.PI*2,r=7+Math.random()*26,x=Math.cos(a)*r,z=Math.sin(a)*r;if(r>30)continue;if(Math.random()<.72)addTree(x,z,.7+Math.random()*.7);else addRock(x,z,.7+Math.random()*.8,Math.random()<.18)}
+// A small ruined camp and a landmark make the island readable.
+const ruin=new THREE.Group();for(let i=0;i<4;i++){let p=new THREE.Mesh(new THREE.BoxGeometry(.22,1.8,.22),trunk);p.position.set(Math.cos(i*Math.PI/2)*2,.9,Math.sin(i*Math.PI/2)*2);p.rotation.z=(i%2?-.08:.08);ruin.add(p)}let roof=new THREE.Mesh(new THREE.BoxGeometry(4.3,.2,4.3),mat(0x71634b));roof.position.y=1.9;roof.rotation.y=.2;ruin.add(roof);ruin.position.set(-7,0,-8);scene.add(ruin);
+// Distant industrial wreck silhouettes on the horizon.
+for(let i=0;i<7;i++){
+  const x=-42+i*14,z=-49-Math.random()*10;
+  const tower=new THREE.Group();
+  const legmat=mat(0x555b55);
+  const leg=new THREE.Mesh(new THREE.CylinderGeometry(.16,.24,8+Math.random()*5,5),legmat);
+  leg.position.y=4; tower.add(leg);
+  const cross=new THREE.Mesh(new THREE.BoxGeometry(3.4,.18,.2),legmat);cross.position.y=6;tower.add(cross);
+  tower.position.set(x,0,z);scene.add(tower);
 }
-function drawGlow(color, x, y, size, alpha){
-  ctx.globalAlpha = alpha;
-  ctx.drawImage(glowSprite(color), x - size/2, y - size/2, size, size);
-  ctx.globalAlpha = 1;
+const player={x:0,z:7,y:1.7,yaw:0,pitch:0,health:100,hunger:100,thirst:100,wood:0,stone:0,metal:0,food:3,water:2,selected:1,alive:true};
+let running=false,locked=false,last=performance.now(),elapsed=0,daytime=8,toastTimer=0,swing=0,lastHit=0;
+const keys={}; const toast=document.querySelector('#toast'),prompt=document.querySelector('#prompt');
+function say(t){toast.textContent=t;toast.style.opacity=1;toastTimer=2.4}
+function ui(){for(const k of ['wood','stone','metal','food'])document.getElementById(k).textContent=player[k];
+for(const k of ['wood','stone','metal','food','water']){const el=document.getElementById('inv'+k[0].toUpperCase()+k.slice(1));if(el)el.textContent=player[k]}
+const requirements={craftBow:player.wood<50||player.stone<10,craftFloor:player.wood<50,craftWall:player.wood<30||player.stone<40,craftFire:player.wood<25||player.stone<5};
+for(const id in requirements){const b=document.getElementById(id);if(b)b.disabled=requirements[id]}
+for(const k of ['health','hunger','thirst']){document.getElementById(k).textContent=Math.ceil(player[k]);document.getElementById(k+'bar').style.width=Math.max(0,player[k])+'%'}document.querySelectorAll('.slot').forEach((e,i)=>e.classList.toggle('active',i+1===player.selected))}
+const axe= new THREE.Group();const handle=new THREE.Mesh(new THREE.CylinderGeometry(.045,.055,.9,6),trunk);handle.rotation.z=-.4;handle.position.set(.28,-.27,-.5);axe.add(handle);const blade=new THREE.Mesh(new THREE.DodecahedronGeometry(.19,0),rockMat);blade.scale.set(1.25,.85,.38);blade.position.set(.48,.02,-.52);blade.rotation.z=-.4;axe.add(blade);camera.add(axe);axe.position.set(.32,-.38,-.7);scene.add(camera);
+const arm=new THREE.Group();const skin=mat(0x986d4d),wrap=mat(0x4c4337);
+const forearm=new THREE.Mesh(new THREE.CylinderGeometry(.09,.13,.52,7),skin);forearm.rotation.z=-.65;forearm.position.set(.32,-.48,-.42);arm.add(forearm);
+const wrist=new THREE.Mesh(new THREE.CylinderGeometry(.105,.105,.13,7),wrap);wrist.rotation.z=-.65;wrist.position.set(.42,-.3,-.48);arm.add(wrist);camera.add(arm);
+const raycaster=new THREE.Raycaster();raycaster.far=4.4;
+function target(){raycaster.setFromCamera(new THREE.Vector2(0,0),camera);let hits=raycaster.intersectObjects(collidables.map(o=>o.obj),true);if(!hits.length)return null;let o=hits[0].object;while(o&&!collidables.some(c=>c.obj===o))o=o.parent;return collidables.find(c=>c.obj===o)||null}
+function collect(){if(!running)return;if(performance.now()-lastHit<260)return;lastHit=performance.now();swing=1;const t=target();if(!t){say('Подойди ближе к дереву или камню');return}if(t.type==='tree'){player.wood+=12;t.hp--;say(' +12 дерева');}else if(t.type==='rock'){player.stone+=8;t.hp--;say(' +8 камня')}else{player.metal+=4;t.hp--;say(' +4 металла')}if(t.hp<=0){scene.remove(t.obj);collidables.splice(collidables.indexOf(t),1)}ui()}
+function interact(){if(player.selected===3){if(player.wood>=30&&player.stone>=10){player.wood-=30;player.stone-=10;const b=new THREE.Mesh(new THREE.BoxGeometry(2.8,1.8,2.8),mat(0x806345));b.position.set(player.x+Math.sin(player.yaw)*4,.9,player.z-Math.cos(player.yaw)*4);b.castShadow=true;scene.add(b);say('Укрытие построено! −30 дерева, −10 камня');ui()}else say('Для укрытия нужно 30 дерева и 10 камня')}else if(player.selected===4){if(player.food>0){player.food--;player.hunger=Math.min(100,player.hunger+28);say('Ты съел ягоды: +голод');ui()}else say('Еды нет')}else if(player.selected===5){if(player.water>0){player.water--;player.thirst=Math.min(100,player.thirst+35);say('Ты выпил воду: +жажда');ui()}else say('Воды нет')}else collect()}
+function placeBuild(kind){
+ let obj;
+ if(kind==='floor'){obj=new THREE.Mesh(new THREE.BoxGeometry(3,.22,3),mat(0x76583b));obj.position.set(player.x+Math.sin(player.yaw)*4,.12,player.z-Math.cos(player.yaw)*4);}
+ if(kind==='wall'){obj=new THREE.Mesh(new THREE.BoxGeometry(3,2.1,.22),mat(0x67472e));obj.position.set(player.x+Math.sin(player.yaw)*4,1.15,player.z-Math.cos(player.yaw)*4);}
+ if(kind==='fire'){obj=new THREE.Group();const ring=new THREE.Mesh(new THREE.TorusGeometry(.42,.12,5,9),rockMat);ring.rotation.x=Math.PI/2;ring.position.y=.12;obj.add(ring);const flame=new THREE.Mesh(new THREE.ConeGeometry(.22,.7,6),new THREE.MeshBasicMaterial({color:0xff6a18}));flame.position.y=.48;obj.add(flame);obj.position.set(player.x+Math.sin(player.yaw)*2,0,player.z-Math.cos(player.yaw)*2);}
+ if(obj){obj.castShadow=true;obj.receiveShadow=true;scene.add(obj)}
 }
-
-/* ============================================================
-   INPUT
-============================================================ */
-class Input {
-  constructor(map){ this.map = map; this.down = {}; }
-  isDown(a){ const c = this.map[a]; return Array.isArray(c) ? c.some(k => this.down[k]) : !!this.down[c]; }
+function craft(id){
+ if(id==='craftBow'&&player.wood>=50&&player.stone>=10){player.wood-=50;player.stone-=10;say('Создан примитивный лук');}
+ else if(id==='craftFloor'&&player.wood>=50){player.wood-=50;placeBuild('floor');say('Фундамент установлен');}
+ else if(id==='craftWall'&&player.wood>=30&&player.stone>=40){player.wood-=30;player.stone-=40;placeBuild('wall');say('Стена установлена');}
+ else if(id==='craftFire'&&player.wood>=25&&player.stone>=5){player.wood-=25;player.stone-=5;placeBuild('fire');say('Костёр установлен');}
+ else say('Не хватает ресурсов');ui();
 }
-const inP1 = new Input({ left:"KeyA", right:"KeyD", up:"KeyW", down:"KeyS", jump:"KeyW", light:"KeyJ", heavy:"KeyK" });
-const inP2 = new Input({ left:"ArrowLeft", right:"ArrowRight", up:"ArrowUp", down:"ArrowDown", jump:"ArrowUp", light:["Numpad1","KeyO"], heavy:["Numpad2","KeyP"] });
-addEventListener("keydown", e => {
-  inP1.down[e.code] = true; inP2.down[e.code] = true;
-  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
-});
-addEventListener("keyup", e => { inP1.down[e.code] = false; inP2.down[e.code] = false; });
-
-/* ============================================================
-   ПЛАТФОРМЫ (градиенты закэшированы — не создаются каждый кадр)
-============================================================ */
-class Platform {
-  constructor(x,y,w,h){
-    this.x=x; this.y=y; this.w=w; this.h=h;
-    this.bodyGrad = ctx.createLinearGradient(0, y, 0, y + h);
-    this.bodyGrad.addColorStop(0, "#4a5a78");
-    this.bodyGrad.addColorStop(0.25, "#37445e");
-    this.bodyGrad.addColorStop(1, "#232c40");
-    this.edgeGrad = ctx.createLinearGradient(0, y-3, 0, y+9);
-    this.edgeGrad.addColorStop(0, "#8df0a8");
-    this.edgeGrad.addColorStop(1, "rgba(80,200,140,0.25)");
-  }
-  draw(){
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.fillRect(this.x+4, this.y+6, this.w, this.h);
-    ctx.fillStyle = this.bodyGrad;
-    rr(this.x, this.y, this.w, this.h, 8); ctx.fill();
-    ctx.fillStyle = this.edgeGrad;
-    rr(this.x, this.y-3, this.w, 9, 5); ctx.fill();
-    ctx.strokeStyle = "rgba(160,255,200,0.5)"; ctx.lineWidth = 1.5;
-    rr(this.x, this.y-3, this.w, 9, 5); ctx.stroke();
-    ctx.strokeStyle = "rgba(0,0,0,0.22)"; ctx.lineWidth = 2;
-    for (let i = 1; i < 4; i++){
-      ctx.beginPath();
-      ctx.moveTo(this.x + (this.w/4)*i + ((i%2)?10:-10), this.y + 10);
-      ctx.lineTo(this.x + (this.w/4)*i - ((i%2)?6:-6), this.y + this.h - 6);
-      ctx.stroke();
-    }
-  }
-}
-const platforms = [
-  new Platform(240, 620, 800, 40),
-  new Platform(120, 420, 260, 24),
-  new Platform(900, 420, 260, 24),
-];
-
-/* ============================================================
-   ЧАСТИЦЫ
-============================================================ */
-class Particles {
-  constructor(){ this.list = []; }
-  emit(x, y, opts){
-    const n = Math.min(opts.n || 8, 60);
-    if (this.list.length > MAX_PARTICLES) this.list.splice(0, n);
-    for (let i = 0; i < n; i++){
-      const a = (opts.angle !== undefined ? opts.angle : Math.random()*Math.PI*2) + (Math.random()-0.5)*(opts.spread || 0.8);
-      const sp = (opts.speed || 200) * (0.4 + Math.random()*0.8);
-      this.list.push({
-        x, y, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp - (opts.up || 0),
-        life: 0, max: (opts.life || 0.5) * (0.6 + Math.random()*0.7),
-        size: (opts.size || 4) * (0.6 + Math.random()*0.8),
-        color: Array.isArray(opts.color) ? opts.color[i % opts.color.length] : opts.color,
-        grav: opts.grav !== undefined ? opts.grav : 600,
-        drag: opts.drag || 0.9, glow: opts.glow
-      });
-    }
-  }
-  update(dt){
-    for (let i = this.list.length-1; i >= 0; i--){
-      const p = this.list[i];
-      p.life += dt;
-      if (p.life >= p.max){ this.list.splice(i,1); continue; }
-      p.vy += p.grav * dt;
-      const d = Math.pow(p.drag, dt*60);
-      p.vx *= d; p.vy *= d;
-      p.x += p.vx * dt; p.y += p.vy * dt;
-    }
-  }
-  draw(){
-    for (const p of this.list){
-      const t = 1 - p.life / p.max;
-      const s = p.size * (0.4 + t*0.8);
-      if (p.glow){
-        ctx.globalCompositeOperation = "lighter";
-        drawGlow(p.color, p.x, p.y, s*4, t*0.9);
-        ctx.globalCompositeOperation = "source-over";
-      } else {
-        ctx.globalAlpha = t;
-        ctx.fillStyle = p.color;
-        ctx.beginPath(); ctx.arc(p.x, p.y, s, 0, 6.2832); ctx.fill();
-      }
-    }
-    ctx.globalAlpha = 1;
-  }
-}
-
-/* ============================================================
-   ИГРОК
-============================================================ */
-class Player {
-  constructor(x, y, color, accent, name, input){
-    this.spawn = {x, y};
-    this.color = color; this.accent = accent; this.name = name; this.input = input;
-    this.trail = [];
-    this.bodyGrad = ctx.createLinearGradient(-22, -28, 22, 28);
-    this.bodyGrad.addColorStop(0, lighten(color, 0.35));
-    this.bodyGrad.addColorStop(0.5, color);
-    this.bodyGrad.addColorStop(1, darken(color, 0.3));
-    this.reset();
-  }
-  reset(){
-    this.x = this.spawn.x; this.y = this.spawn.y;
-    this.vx = 0; this.vy = 0;
-    this.w = 44; this.h = 56;
-    this.damage = 0; this.stocks = START_STOCKS;
-    this.facing = this.name === "P1" ? 1 : -1;
-    this.onGround = false; this.dropTimer = 0; this.jumpsLeft = 2; this.fastFalling = false;
-    this.attack = null; this.hitstun = 0; this.hitstop = 0; this.invuln = 0;
-    this.respawnTimer = 0; this.alive = true;
-    this.hitFlash = 0; this.blink = 2 + Math.random()*3; this.blinking = 0;
-    this.squash = 0; this.runT = 0; this.trail.length = 0;
-  }
-  get center(){ return { x: this.x + this.w/2, y: this.y + this.h/2 }; }
-
-  update(dt, game){
-    if (!this.alive){
-      this.respawnTimer -= dt;
-      if (this.respawnTimer <= 0 && this.stocks > 0) this.respawn();
-      return;
-    }
-    // страховка от NaN/Infinity
-    if (!isFinite(this.x + this.y + this.vx + this.vy)){
-      this.x = this.spawn.x; this.y = this.spawn.y; this.vx = 0; this.vy = 0;
-    }
-    if (this.hitstop > 0){ this.hitstop -= dt; return; }
-    if (this.invuln > 0) this.invuln -= dt;
-    if (this.hitFlash > 0) this.hitFlash -= dt;
-    this.blink -= dt; if (this.blink <= 0){ this.blinking = 0.12; this.blink = 2 + Math.random()*3; }
-    if (this.blinking > 0) this.blinking -= dt;
-
-    const inp = this.input;
-    const stunned = this.hitstun > 0;
-    if (stunned) this.hitstun -= dt;
-
-    if (!stunned && !this.attack){
-      let move = 0;
-      if (inp.isDown("left")) move -= 1;
-      if (inp.isDown("right")) move += 1;
-      if (move !== 0){
-        this.vx += move * (this.onGround ? PHYS.groundAccel : PHYS.airAccel) * dt;
-        this.facing = move;
-        this.runT += dt * Math.abs(this.vx) * 0.045;
-      } else {
-        this.vx = approach(this.vx, 0, (this.onGround ? PHYS.groundFriction : PHYS.airFriction) * dt);
-      }
-      this.vx = clamp(this.vx, -PHYS.moveSpeed*(this.onGround?1:1.2), PHYS.moveSpeed*(this.onGround?1:1.2));
-
-      if (pressed(inp, "jump", this)){
-        if (inp.isDown("down") && this.onGround){
-          this.dropTimer = 0.22; this.onGround = false; this.y += 2;
-        } else if (this.onGround){
-          this.vy = -PHYS.jumpVel; this.onGround = false; this.jumpsLeft = 1;
-          game.particles.emit(this.center.x, this.y + this.h, { n:8, color:["#cfd8ea","#8fa0c0"], speed:120, up:50, size:4, grav:300, life:0.35 });
-        } else if (this.jumpsLeft > 0){
-          this.vy = -PHYS.doubleJumpVel; this.jumpsLeft--;
-          game.particles.emit(this.center.x, this.y + this.h, { n:10, color:["#9fd8ff","#e8f6ff"], speed:150, angle:Math.PI/2, spread:2.4, size:3, grav:200, life:0.3, glow:true });
-        }
-      }
-      if (!this.onGround && inp.isDown("down") && this.vy > -200 && !this.fastFalling){
-        this.fastFalling = true; this.vy = Math.max(this.vy, PHYS.fastFallVel);
-      }
-      if (this.onGround) this.fastFalling = false;
-
-      if (pressed(inp, "light", this)) this.startAttack("light");
-      else if (pressed(inp, "heavy", this)) this.startAttack("heavy");
-    }
-
-    if (this.attack){
-      const a = this.attack, def = a.def;
-      a.t += dt;
-      if (this.onGround && a.t > def.startup + def.active) this.vx = approach(this.vx, 0, 4000*dt);
-      if (a.t >= def.startup + def.active + def.endlag) this.attack = null;
-    }
-
-    this.vy += PHYS.gravity * dt;
-    if (this.fastFalling && this.vy < PHYS.fastFallVel) this.vy = PHYS.fastFallVel;
-    this.vy = Math.min(this.vy, this.fastFalling ? PHYS.fastFallVel : PHYS.maxFall);
-
-    this.x += this.vx * dt;
-    this.y += this.vy * dt;
-    if (this.dropTimer > 0) this.dropTimer -= dt;
-
-    const wasAir = !this.onGround;
-    const impactVy = this.vy;
-    this.onGround = false;
-    if (this.vy >= 0 && this.dropTimer <= 0){
-      for (const p of platforms){
-        const prevBottom = this.y + this.h - this.vy*dt;
-        if (this.x + this.w > p.x && this.x < p.x + p.w &&
-            this.y + this.h >= p.y && prevBottom <= p.y + 8){
-          this.y = p.y - this.h;
-          if (wasAir && impactVy > 500){
-            this.squash = Math.min(0.35, impactVy/3000);
-            game.particles.emit(this.center.x, p.y, { n:Math.min(12, (impactVy/100)|0), color:["#cfd8ea","#aab8d0"], speed:160, angle:-Math.PI/2, spread:2.6, size:4, grav:250, life:0.35 });
-            game.shake(Math.min(5, impactVy/500));
-          }
-          this.vy = 0; this.onGround = true; this.jumpsLeft = 2; this.fastFalling = false;
-        }
-      }
-    }
-    this.squash = approach(this.squash, 0, dt*2.2);
-    this.x = clamp(this.x, 20, W - 20 - this.w);
-
-    const hb = this.getHitbox();
-    if (hb) this.trail.push({ x: hb.x + hb.w/2, y: hb.y + hb.h/2, t: 0.12 });
-    for (let i = this.trail.length-1; i >= 0; i--){ this.trail[i].t -= dt; if (this.trail[i].t <= 0) this.trail.splice(i,1); }
-
-    if (this.x < PHYS.blastLeft || this.x + this.w > PHYS.blastRight ||
-        this.y > PHYS.blastBottom || this.y + this.h < PHYS.blastTop){
-      game.onDeath(this);
-    }
-  }
-
-  startAttack(type){
-    const def = ATTACKS[type];
-    this.attack = { type, def, t: 0, dir: this.facing, hitSet: new Set() };
-    if (type === "heavy") this.vx *= 0.3;
-  }
-
-  getHitbox(){
-    if (!this.attack) return null;
-    const { def, t, dir } = this.attack;
-    if (t < def.startup || t > def.startup + def.active) return null;
-    const c = this.center;
-    return { x: c.x + dir*def.range - def.size/2, y: c.y - def.size/2, w: def.size, h: def.size, owner: this, def, dir };
-  }
-
-  takeHit(hitbox, game){
-    const def = hitbox.def;
-    this.damage = Math.min(MAX_DMG, this.damage + def.damage);
-    const mag = def.baseKB + this.damage * def.kbGrowth;
-    const rad = def.angle * Math.PI / 180;
-    const dirX = Math.sign(this.center.x - hitbox.owner.center.x) || hitbox.dir;
-    this.vx = Math.cos(rad) * mag * dirX;
-    this.vy = -Math.sin(rad) * mag;
-    this.hitstun = Math.min(1.2, 0.12 + mag/2600);
-    this.hitstop = def.hitstop;
-    this.hitFlash = 0.15;
-    this.attack = null; this.onGround = false; this.trail.length = 0;
-    game.freeze(def.hitstop);
-
-    const c = this.center;
-    game.particles.emit(c.x, c.y, { n: def === ATTACKS.heavy ? 20 : 10, color:["#fff6c8", def.color, "#ffffff"], speed: 380, size: 4, grav: 300, life: 0.45, glow: true, drag: 0.85 });
-    game.shake(def === ATTACKS.heavy ? 8 : 4);
-    game.popup("-" + def.damage, c.x, c.y - 40, def.color);
-  }
-
-  respawn(){
-    this.x = this.spawn.x; this.y = this.spawn.y;
-    this.vx = 0; this.vy = 0; this.damage = 0;
-    this.alive = true; this.invuln = 2.0;
-    this.hitstun = 0; this.attack = null; this.trail.length = 0;
-  }
-
-  drawShadow(){
-    if (!this.alive) return;
-    let best = null;
-    for (const p of platforms){
-      if (this.x + this.w/2 > p.x && this.x + this.w/2 < p.x + p.w && p.y >= this.y + this.h - 4){
-        if (!best || p.y < best) best = p.y;
-      }
-    }
-    if (best === null) return;
-    const d = clamp((best - (this.y + this.h)) / 400, 0, 1);
-    ctx.globalAlpha = 0.35 * (1 - d*0.7);
-    ctx.fillStyle = "#000";
-    ctx.beginPath();
-    ctx.ellipse(this.center.x, best + 4, this.w*0.45*(1-d*0.3), 7*(1-d*0.3), 0, 0, 6.2832);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-
-  draw(){
-    if (!this.alive) return;
-    const c = this.center;
-    const blinkInv = this.invuln > 0 && Math.floor(this.invuln*12) % 2 === 0;
-
-    if (this.invuln > 1.4){
-      const a = (this.invuln - 1.4) / 0.6;
-      const g = ctx.createLinearGradient(0, 0, 0, this.y + this.h);
-      g.addColorStop(0, "rgba(180,230,255,0)");
-      g.addColorStop(1, `rgba(180,230,255,${0.5*a})`);
-      ctx.fillStyle = g;
-      ctx.fillRect(c.x - 26, 0, 52, this.y + this.h);
-    }
-
-    ctx.save();
-    ctx.translate(c.x, c.y);
-
-    let sx = 1, sy = 1;
-    if (this.squash > 0){ sx = 1 + this.squash; sy = 1 - this.squash; }
-    else if (!this.onGround){
-      const st = clamp(Math.abs(this.vy)/2800, 0, 0.22);
-      sx = 1 - st*0.6; sy = 1 + st;
-    }
-    ctx.rotate(clamp(this.vx * 0.00035, -0.16, 0.16));
-    ctx.scale(sx, sy);
-    if (blinkInv) ctx.globalAlpha = 0.35;
-
-    if (this.attack && this.attack.t < this.attack.def.startup){
-      const p = this.attack.t / this.attack.def.startup;
-      ctx.translate(-this.attack.dir * p * 10, 0);
-    }
-
-    const hw = this.w/2, hh = this.h/2;
-    const armSwing = this.onGround ? Math.sin(this.runT) * clamp(Math.abs(this.vx)/PHYS.moveSpeed, 0, 1) * 0.9 : 0.35;
-    this.drawArm(-this.facing, armSwing, false);
-
-    const flash = this.hitFlash > 0;
-    ctx.fillStyle = flash ? "#fff" : this.bodyGrad;
-    rr(-hw, -hh, this.w, this.h, 14); ctx.fill();
-    ctx.strokeStyle = "rgba(0,0,0,0.4)"; ctx.lineWidth = 2.5; ctx.stroke();
-
-    ctx.fillStyle = this.accent;
-    rr(-hw, hh*0.25, this.w, 8, 4); ctx.fill();
-
-    ctx.beginPath();
-    ctx.moveTo(-8, -hh + 2);
-    ctx.quadraticCurveTo(0, -hh - 14, 10, -hh + 2);
-    ctx.closePath(); ctx.fill();
-
-    const lookX = this.facing * 3.5;
-    const ey = -hh + 17;
-    ctx.fillStyle = "#fff";
-    for (const s of [-1, 1]){
-      const ex = s * 9 + (this.facing > 0 ? 2 : -2);
-      ctx.beginPath(); ctx.ellipse(ex, ey, 6.5, this.blinking > 0 ? 1 : 7.5, 0, 0, 6.2832); ctx.fill();
-    }
-    if (this.blinking <= 0){
-      ctx.fillStyle = "#141a24";
-      for (const s of [-1, 1]){
-        const ex = s * 9 + (this.facing > 0 ? 2 : -2);
-        ctx.beginPath(); ctx.arc(ex + lookX, ey + 1, 3, 0, 6.2832); ctx.fill();
-      }
-      ctx.fillStyle = "#fff";
-      for (const s of [-1, 1]){
-        const ex = s * 9 + (this.facing > 0 ? 2 : -2);
-        ctx.beginPath(); ctx.arc(ex + lookX + 1, ey, 1.1, 0, 6.2832); ctx.fill();
-      }
-    }
-    if (this.hitstun > 0){
-      ctx.strokeStyle = "#141a24"; ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(-14, ey - 10); ctx.lineTo(-4, ey - 7);
-      ctx.moveTo(14, ey - 10); ctx.lineTo(4, ey - 7);
-      ctx.stroke();
-    }
-
-    this.drawArm(this.facing, -armSwing, true);
-    ctx.restore();
-
-    // шлейф атаки
-    if (this.trail.length > 1){
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      ctx.strokeStyle = this.attack ? this.attack.def.color : "#fff";
-      ctx.lineCap = "round";
-      for (let i = 1; i < this.trail.length; i++){
-        const a = this.trail[i-1], b = this.trail[i];
-        ctx.globalAlpha = (b.t / 0.12) * 0.5;
-        ctx.lineWidth = 5 + (b.t/0.12) * 18;
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-      }
-      ctx.restore();
-    }
-    const hb = this.getHitbox();
-    if (hb){
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      drawGlow(hb.def.color, hb.x + hb.w/2, hb.y + hb.h/2, hb.size * 1.7, 0.55);
-      ctx.restore();
-    }
-  }
-
-  drawArm(side, swing, front){
-    const hb = this.getHitbox();
-    const shoulderY = front ? -6 : -2;
-    let ax = side * (this.w/2 + 2), ay = shoulderY;
-    if (hb){
-      const c = this.center;
-      const tx = (hb.x + hb.w/2) - c.x, ty = (hb.y + hb.h/2) - c.y;
-      const L = Math.hypot(tx, ty) || 1;
-      ax = tx * 0.8; ay = ty * 0.8;
-    } else {
-      ay += swing * 8 + (this.onGround ? 0 : 4);
-    }
-    if (!front && this.attack) return;
-    ctx.strokeStyle = darken(this.color, 0.15);
-    ctx.lineWidth = 9; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(side * (this.w/2 - 6), shoulderY); ctx.lineTo(ax, ay); ctx.stroke();
-    ctx.fillStyle = this.accent;
-    ctx.beginPath(); ctx.arc(ax, ay, 7, 0, 6.2832); ctx.fill();
-    ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 2; ctx.stroke();
-  }
-}
-
-/* ============================================================
-   ФОН (всё статичное закэшировано в offscreen-канвасах)
-============================================================ */
-class Background {
-  constructor(){
-    // небо
-    this.sky = document.createElement("canvas");
-    this.sky.width = W; this.sky.height = H;
-    let sctx = this.sky.getContext("2d");
-    const sky = sctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, "#1b1140");
-    sky.addColorStop(0.45, "#5b2a6e");
-    sky.addColorStop(0.75, "#c94f5d");
-    sky.addColorStop(1, "#f2955a");
-    sctx.fillStyle = sky; sctx.fillRect(0, 0, W, H);
-    // звёзды
-    sctx.fillStyle = "rgba(255,255,255,0.7)";
-    for (let i = 0; i < 60; i++){
-      const sx = (i * 173.3) % W, sy = (i * 97.7) % 260;
-      sctx.globalAlpha = 0.9 - sy/320;
-      sctx.fillRect(sx, sy, 2, 2);
-    }
-    sctx.globalAlpha = 1;
-    // солнце
-    const sunX = W*0.72, sunY = 300;
-    let sg = sctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 220);
-    sg.addColorStop(0, "rgba(255,240,200,0.9)");
-    sg.addColorStop(0.25, "rgba(255,190,120,0.45)");
-    sg.addColorStop(1, "rgba(255,150,90,0)");
-    sctx.fillStyle = sg;
-    sctx.beginPath(); sctx.arc(sunX, sunY, 220, 0, 6.2832); sctx.fill();
-    sctx.fillStyle = "#ffe9c4";
-    sctx.beginPath(); sctx.arc(sunX, sunY, 55, 0, 6.2832); sctx.fill();
-    // горы
-    this.drawPeaks(sctx, this.genPeaks(0.008, 340, 90), "#3a2354", 0.55);
-    this.drawPeaks(sctx, this.genPeaks(0.013, 470, 130), "#2a183e", 0.8);
-    // туман
-    const fog = sctx.createLinearGradient(0, 480, 0, 640);
-    fog.addColorStop(0, "rgba(242,149,90,0)");
-    fog.addColorStop(1, "rgba(242,149,90,0.35)");
-    sctx.fillStyle = fog; sctx.fillRect(0, 480, W, 200);
-
-    this.clouds = [];
-    for (let i = 0; i < 7; i++)
-      this.clouds.push({ x: Math.random()*W, y: 40 + Math.random()*240, s: 0.6 + Math.random()*0.9, v: 6 + Math.random()*14 });
-    // виньетка
-    this.vignette = ctx.createRadialGradient(W/2, H/2, H*0.45, W/2, H/2, H*0.95);
-    this.vignette.addColorStop(0, "rgba(0,0,0,0)");
-    this.vignette.addColorStop(1, "rgba(0,0,0,0.45)");
-  }
-  genPeaks(f, base, amp){
-    const pts = [];
-    for (let x = -50; x <= W + 50; x += 18)
-      pts.push({ x, y: base - (Math.sin(x*f)*0.5 + Math.sin(x*f*2.7 + 1.3)*0.3 + Math.sin(x*f*6.1)*0.2) * amp });
-    return pts;
-  }
-  drawPeaks(sctx, pts, color, alpha){
-    sctx.globalAlpha = alpha;
-    sctx.fillStyle = color;
-    sctx.beginPath();
-    sctx.moveTo(-50, H);
-    for (const p of pts) sctx.lineTo(p.x, p.y);
-    sctx.lineTo(W + 50, H);
-    sctx.closePath(); sctx.fill();
-    sctx.globalAlpha = 1;
-  }
-  draw(dt, t){
-    ctx.drawImage(this.sky, 0, 0);
-    // облака — дешёвые круги
-    ctx.fillStyle = "#e8b8d8";
-    for (const cl of this.clouds){
-      cl.x += cl.v * dt;
-      if (cl.x > W + 140) cl.x = -140;
-      ctx.globalAlpha = 0.45;
-      for (const [ox, oy, r] of [[0,0,34],[28,6,26],[-30,8,24],[10,-14,24]]){
-        ctx.beginPath(); ctx.arc(cl.x + ox*cl.s, cl.y + oy*cl.s, r*cl.s, 0, 6.2832); ctx.fill();
-      }
-    }
-    ctx.globalAlpha = 1;
-  }
-  drawVignette(){
-    ctx.fillStyle = this.vignette;
-    ctx.fillRect(0, 0, W, H);
-  }
-}
-
-/* ============================================================
-   ИГРА
-============================================================ */
-class Game {
-  constructor(){
-    this.p1 = new Player(420, 500, "#3b82f6", "#facc15", "P1", inP1);
-    this.p2 = new Player(820, 500, "#ef4444", "#a3e635", "P2", inP2);
-    this.players = [this.p1, this.p2];
-    this.bg = new Background();
-    this.particles = new Particles();
-    this.freezeTimer = 0; this.shakeMag = 0;
-    this.over = false; this.winner = null;
-    this.popups = [];
-    this.countdown = 2.4;
-    this.last = performance.now();
-    addEventListener("keydown", e => { if (e.code === "Enter" && this.over) this.restart(); });
-    requestAnimationFrame(t => this.loop(t));
-  }
-  restart(){
-    for (const p of this.players) p.reset();
-    this.over = false; this.winner = null; this.freezeTimer = 0;
-    this.popups.length = 0; this.particles.list.length = 0;
-    this.countdown = 2.4;
-  }
-  freeze(d){ this.freezeTimer = Math.max(this.freezeTimer, d); }
-  shake(m){ this.shakeMag = Math.max(this.shakeMag, m); }
-  popup(text, x, y, color){ this.popups.push({ text, x, y, t: 0, color }); }
-  onDeath(p){
-    if (!p.alive || this.over) return;
-    p.stocks--;
-    p.alive = false;
-    p.respawnTimer = 1.4;
-    const c = p.center;
-    const ex = clamp(c.x, 60, W-60), ey = clamp(c.y, 60, H-60);
-    this.particles.emit(ex, ey, { n: 36, color: ["#ffffff", p.color, "#ffd76a", "#ff9a5a"], speed: 560, size: 6, grav: 500, life: 0.8, glow: true, drag: 0.88 });
-    this.shake(12);
-    this.freeze(0.2);
-    this.popup("K.O.!", ex, ey - 30, "#ffd76a");
-    if (p.stocks <= 0){ this.over = true; this.winner = this.players.find(q => q !== p); this.freeze(0.4); }
-  }
-  loop(now){
-    let dt = Math.min((now - this.last)/1000, 1/30);
-    this.last = now;
-    this.particles.update(dt);
-    for (let i = this.popups.length-1; i >= 0; i--){
-      const p = this.popups[i]; p.t += dt; p.y -= 50*dt;
-      if (p.t > 0.9) this.popups.splice(i,1);
-    }
-    if (this.freezeTimer > 0) this.freezeTimer -= dt;
-    else if (!this.over){
-      if (this.countdown > 0) this.countdown -= dt;
-      else this.update(dt);
-    }
-    this.shakeMag *= 0.86;
-    this.draw(now/1000);
-    requestAnimationFrame(t => this.loop(t));
-  }
-  update(dt){
-    for (const p of this.players) p.update(dt, this);
-    for (const attacker of this.players){
-      const hb = attacker.getHitbox();
-      if (!hb || !attacker.attack.hitSet) continue;
-      for (const victim of this.players){
-        if (victim === attacker || !victim.alive || victim.invuln > 0 || victim.hitstop > 0) continue;
-        if (attacker.attack.hitSet.has(victim)) continue;   // один активный хитбокс = одно попадание
-        if (rectsOverlap(hb, victim)){
-          attacker.attack.hitSet.add(victim);
-          victim.takeHit(hb, this);
-        }
-      }
-    }
-  }
-  draw(t){
-    ctx.save();
-    if (this.shakeMag > 0.3){
-      ctx.translate((Math.random()-0.5)*this.shakeMag, (Math.random()-0.5)*this.shakeMag);
-    }
-    const dt = 1/60;
-    this.bg.draw(dt, t);
-    for (const p of platforms) p.draw();
-    for (const p of this.players) p.drawShadow();
-    for (const p of this.players) p.draw();
-    this.particles.draw();
-
-    ctx.strokeStyle = "rgba(255,70,70,0.55)";
-    ctx.setLineDash([14,10]); ctx.lineWidth = 3;
-    ctx.strokeRect(PHYS.blastLeft, PHYS.blastTop, PHYS.blastRight-PHYS.blastLeft, PHYS.blastBottom-PHYS.blastTop);
-    ctx.setLineDash([]);
-    ctx.restore();
-
-    this.bg.drawVignette();
-
-    for (const p of this.popups){
-      const a = p.t < 0.7 ? 1 : 1 - (p.t-0.7)/0.2;
-      ctx.globalAlpha = a;
-      ctx.font = "bold 44px Arial";
-      ctx.textAlign = "center";
-      ctx.lineWidth = 6; ctx.strokeStyle = "rgba(0,0,0,0.7)";
-      ctx.strokeText(p.text, p.x, p.y);
-      ctx.fillStyle = p.color;
-      ctx.fillText(p.text, p.x, p.y);
-      ctx.globalAlpha = 1;
-    }
-    ctx.textAlign = "left";
-
-    this.drawHUD();
-    if (this.countdown > 0 && !this.over) this.drawCountdown();
-    if (this.over) this.drawGameOver(t);
-  }
-  drawHUD(){
-    const hud = (p, x, right) => {
-      ctx.textAlign = right ? "right" : "left";
-      ctx.save();
-      ctx.translate(x + (right ? 12 : -12), 24);
-      ctx.transform(1, 0, right ? 0.35 : -0.35, 1, 0, 0);
-      ctx.fillStyle = "rgba(10,12,20,0.75)";
-      rr(right ? -176 : 0, 0, 176, 34, 6); ctx.fill();
-      ctx.fillStyle = p.color;
-      rr(right ? -176 : 0, 0, 6, 34, 3); ctx.fill();
-      ctx.restore();
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 20px Arial";
-      ctx.fillText(p.name, x + (right ? -2 : 20), 47);
-
-      const pct = Math.floor(p.damage) + "%";
-      const heat = clamp(p.damage / 130, 0, 1);
-      const col = p.damage < 30 ? "#f5f5f5" : `hsl(${55 - heat*55},100%,${62 - heat*10}%)`;
-      ctx.font = "bold 58px Arial";
-      // псевдо-свечение: обводка + два полупрозрачных слоя
-      ctx.lineWidth = 8; ctx.strokeStyle = "rgba(0,0,0,0.75)";
-      ctx.strokeText(pct, x, 108);
-      ctx.globalAlpha = 0.35 + heat*0.3;
-      ctx.fillStyle = col;
-      ctx.fillText(pct, x + 2, 110);
-      ctx.globalAlpha = 1;
-      ctx.fillText(pct, x, 108);
-
-      for (let i = 0; i < START_STOCKS; i++){
-        const sx = x + (right ? -18 - i*26 : 18 + i*26);
-        ctx.save();
-        ctx.translate(sx, 132); ctx.rotate(Math.PI/4);
-        ctx.fillStyle = i < p.stocks ? "#ffd54a" : "rgba(255,255,255,0.15)";
-        ctx.fillRect(-7, -7, 14, 14);
-        ctx.restore();
-      }
-    };
-    hud(this.p1, 46, false);
-    hud(this.p2, W - 46, true);
-    ctx.textAlign = "left";
-  }
-  drawCountdown(){
-    const n = Math.ceil(this.countdown / 0.8);
-    const frac = (this.countdown % 0.8) / 0.8;
-    ctx.save();
-    ctx.textAlign = "center";
-    ctx.globalAlpha = clamp(frac * 2, 0, 1);
-    ctx.font = "bold 130px Arial";
-    const label = n > 0 ? n : "GO!";
-    ctx.lineWidth = 12; ctx.strokeStyle = "rgba(0,0,0,0.8)";
-    ctx.strokeText(label, W/2, H/2 - 40);
-    ctx.fillStyle = n > 0 ? "#ffd76a" : "#7CFC98";
-    ctx.globalAlpha *= 0.5;
-    ctx.fillText(label, W/2 + 3, H/2 - 37);
-    ctx.globalAlpha = clamp(frac * 2, 0, 1);
-    ctx.fillText(label, W/2, H/2 - 40);
-    ctx.restore();
-    ctx.textAlign = "left";
-  }
-  drawGameOver(t){
-    ctx.fillStyle = "rgba(5,6,14,0.6)";
-    ctx.fillRect(0, 0, W, H);
-    ctx.save();
-    ctx.textAlign = "center";
-    ctx.font = "bold 84px Arial";
-    const glow = 0.5 + Math.sin(t*4)*0.2;
-    ctx.lineWidth = 10; ctx.strokeStyle = "rgba(0,0,0,0.85)";
-    ctx.strokeText(this.winner.name + " ПОБЕДИЛ!", W/2, H/2 - 20);
-    ctx.globalAlpha = glow;
-    ctx.fillStyle = this.winner.color;
-    ctx.fillText(this.winner.name + " ПОБЕДИЛ!", W/2 + 3, H/2 - 17);
-    ctx.globalAlpha = 1;
-    const gg = ctx.createLinearGradient(0, H/2 - 90, 0, H/2);
-    gg.addColorStop(0, "#fff"); gg.addColorStop(1, this.winner.color);
-    ctx.fillStyle = gg;
-    ctx.fillText(this.winner.name + " ПОБЕДИЛ!", W/2, H/2 - 20);
-    ctx.fillStyle = "#cdd6e4";
-    ctx.font = "26px Arial";
-    ctx.fillText("Enter — рестарт", W/2, H/2 + 46);
-    ctx.restore();
-    ctx.textAlign = "left";
-  }
-}
-
-/* ============================================================
-   УТИЛИТЫ
-============================================================ */
-function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
-function approach(v, target, step){ return v < target ? Math.min(v+step, target) : Math.max(v-step, target); }
-function rectsOverlap(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
-function rr(x,y,w,h,r){
-  ctx.beginPath();
-  ctx.moveTo(x+r, y);
-  ctx.arcTo(x+w, y, x+w, y+h, r);
-  ctx.arcTo(x+w, y+h, x, y+h, r);
-  ctx.arcTo(x, y+h, x, y, r);
-  ctx.arcTo(x, y, x+w, y, r);
-  ctx.closePath();
-}
-function lighten(hex, k){ const [r,g,b] = hexRgb(hex); return `rgb(${r+(255-r)*k|0},${g+(255-g)*k|0},${b+(255-b)*k|0})`; }
-function darken(hex, k){ const [r,g,b] = hexRgb(hex); return `rgb(${r*(1-k)|0},${g*(1-k)|0},${b*(1-k)|0})`; }
-const _prevKeys = new WeakMap();
-function pressed(inp, action, player){
-  const codes = Array.isArray(inp.map[action]) ? inp.map[action] : [inp.map[action]];
-  const now = codes.some(c => inp.down[c]);
-  let prev = _prevKeys.get(player) || {};
-  const was = prev[action] || false;
-  prev[action] = now;
-  _prevKeys.set(player, prev);
-  return now && !was;
-}
-
-new Game();
+for(const id of ['craftBow','craftFloor','craftWall','craftFire'])document.getElementById(id).addEventListener('click',()=>craft(id));
+const invPanel=document.getElementById('inventoryPanel');
+function toggleInventory(force){const open=typeof force==='boolean'?force:invPanel.style.display!=='grid';invPanel.style.display=open?'grid':'none';if(open&&document.pointerLockElement)document.exitPointerLock();else if(!open&&running)renderer.domElement.requestPointerLock?.();ui()}
+document.getElementById('closeInventory').addEventListener('click',()=>toggleInventory(false));
+function start(){document.querySelector('#overlay').style.display='none';running=true;renderer.domElement.requestPointerLock?.();say('Выживай. Собирай ресурсы. Найди укрытие.')}
+document.querySelector('#start').addEventListener('click',start);
+document.addEventListener('pointerlockchange',()=>locked=document.pointerLockElement===renderer.domElement);
+document.addEventListener('mousemove',e=>{if(!running||!locked)return;player.yaw-=e.movementX*.002;player.pitch-=e.movementY*.002;player.pitch=Math.max(-1.25,Math.min(1.25,player.pitch));camera.rotation.order='YXZ';camera.rotation.y=player.yaw;camera.rotation.x=player.pitch});
+document.addEventListener('keydown',e=>{if(e.code==='Tab'){e.preventDefault();if(running)toggleInventory();return}if(invPanel.style.display==='grid'&&e.code==='Escape'){toggleInventory(false);return}keys[e.code]=true;if(['Digit1','Digit2','Digit3','Digit4','Digit5'].includes(e.code)){player.selected=Number(e.code.slice(-1));ui()}if(e.code==='KeyE')interact();if(e.code==='Escape'&&running){running=false;document.querySelector('#overlay').style.display='grid';document.querySelector('#start').textContent='ПРОДОЛЖИТЬ';document.querySelector('#start').onclick=()=>{document.querySelector('#overlay').style.display='none';running=true;renderer.domElement.requestPointerLock?.()}}if(e.code==='Space')e.preventDefault()});
+document.addEventListener('keyup',e=>keys[e.code]=false);renderer.domElement.addEventListener('mousedown',e=>{if(!running)return;if(!locked){renderer.domElement.requestPointerLock?.();return}if(e.button===0)interact()});
+document.addEventListener('contextmenu',e=>e.preventDefault());
+function animate(now){requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.05);last=now;
+ if(running&&player.alive&&invPanel.style.display!=='grid'){elapsed+=dt;daytime=(8+elapsed/45)%24;player.hunger=Math.max(0,player.hunger-dt*.12);player.thirst=Math.max(0,player.thirst-dt*.19);if(player.hunger===0||player.thirst===0)player.health=Math.max(0,player.health-dt*.8);if(player.health<=0){player.alive=false;running=false;document.querySelector('.menu h1').innerHTML='ТЫ НЕ<br>ВЫЖИЛ.';document.querySelector('.menu p').textContent='Остров забрал ещё одну жизнь. Попробуй снова.';document.querySelector('#start').textContent='НАЧАТЬ ЗАНОВО';document.querySelector('#start').onclick=()=>location.reload();document.querySelector('#overlay').style.display='grid'}const speed=keys.ShiftLeft?8:5;let f=(keys.KeyW?1:0)-(keys.KeyS?1:0),s=(keys.KeyD?1:0)-(keys.KeyA?1:0);const len=Math.hypot(f,s)||1;player.x+=(Math.sin(player.yaw)*f+Math.cos(player.yaw)*s)/len*speed*dt;player.z+=(-Math.cos(player.yaw)*f+Math.sin(player.yaw)*s)/len*speed*dt;let r=Math.hypot(player.x,player.z);if(r>31){player.x*=31/r;player.z*=31/r}camera.position.set(player.x,1.7,player.z);document.querySelector('#day').textContent='ДЕНЬ '+(1+Math.floor(elapsed/180))+' · '+String(Math.floor(daytime)).padStart(2,'0')+':'+String(Math.floor((daytime%1)*60)).padStart(2,'0');document.querySelector('#compass').style.transform='translateX(-50%) rotate('+(player.yaw*8)+'deg)';const t=target();prompt.textContent=t?(t.type==='tree'?'ЛКМ — рубить дерево':t.type==='rock'?'ЛКМ — добыть камень':'ЛКМ — добыть металл'):(player.selected===3?'E — построить укрытие':player.selected===4?'E — съесть ягоды':player.selected===5?'E — выпить воду':'Исследуй остров и собирай ресурсы');if(toastTimer>0){toastTimer-=dt;if(toastTimer<=0)toast.style.opacity=0}if(Math.floor(elapsed)%5===0&&Math.floor(elapsed)!==0){/* passive survival loop */}ui();axe.visible=player.selected===1||player.selected===2;arm.visible=axe.visible; swing=Math.max(0,swing-dt*5);axe.rotation.z=Math.sin(now*.008)*.015-swing*.65;axe.rotation.x=-swing*.45;axe.position.y=-.38-swing*.12}
+ // atmospheric light shifts as time passes
+ const sunY=Math.sin((daytime/24)*Math.PI*2-Math.PI/2);sun.position.set(-35,30+sunY*22,25);sun.intensity=.9+Math.max(0,sunY)*1.5;scene.background.setHSL(.53,.2,.42+Math.max(0,sunY)*.18);scene.fog.color.copy(scene.background);
+ renderer.render(scene,camera)}
+requestAnimationFrame(animate);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+ui();
 </script>
-</body>
-</html>
+</body></html>
