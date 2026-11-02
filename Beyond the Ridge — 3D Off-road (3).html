@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Beyond the Ridge — 3D Off-road</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#9eb4aa;color:#f1f0dc;font-family:Inter,system-ui,Arial}canvas{display:block}
+#hud{position:fixed;inset:0;pointer-events:none}.glass{background:#13241fbd;border:1px solid #ffffff29;border-radius:12px;box-shadow:0 8px 28px #0003}
+#logo{position:absolute;top:16px;left:16px;padding:10px 14px;font-size:10px;letter-spacing:.2em;font-weight:800}#logo b{display:block;font-size:17px;letter-spacing:.12em;margin-top:3px;color:#fff}
+#stats{position:absolute;right:16px;top:16px;padding:10px 14px;min-width:158px;font-size:11px;color:#c1cbb9}.stat{display:flex;justify-content:space-between;gap:20px;margin:5px 0}.stat strong{color:#fff}
+#help{position:absolute;left:16px;bottom:16px;padding:10px 13px;font-size:11px;line-height:1.65;color:#d5dece}
+#hint{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);padding:9px 13px;font-size:11px;white-space:nowrap}
+#map{position:absolute;right:16px;bottom:16px;width:140px;height:105px;border-radius:10px;border:1px solid #ffffff55;background:#172923d9}
+#toast{position:absolute;top:85px;left:50%;transform:translateX(-50%);padding:9px 14px;opacity:0;transition:opacity .2s;font-size:12px}
+#menu{position:fixed;inset:0;z-index:5;display:grid;place-items:center;background:linear-gradient(#101d1bd0,#101d1bea)}
+.card{width:min(520px,calc(100vw - 30px));padding:27px;background:#1b3029;border:1px solid #ffffff2b;border-radius:18px;box-shadow:0 25px 90px #0008}.eyebrow{font-size:10px;letter-spacing:.22em;color:#c1c69e;font-weight:800}.card h1{font-size:clamp(38px,8vw,58px);line-height:.9;letter-spacing:-.06em;margin:14px 0}.card p{font-size:13px;line-height:1.6;color:#c0cbbb}button{border:0;border-radius:9px;background:#d7d1a2;color:#24332b;padding:13px 20px;font-weight:850;letter-spacing:.06em;cursor:pointer;margin-top:9px}
+#mobile{display:none;position:fixed;bottom:18px;left:0;right:0;z-index:4;justify-content:space-between;padding:0 16px;pointer-events:none}.pad{display:grid;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(2,43px);gap:4px;pointer-events:auto}.pad button,.acts button{margin:0;padding:0;background:#14251fc9;border:1px solid #ffffff55;color:white;border-radius:11px;touch-action:none}.pad .up{grid-column:2}.pad .left{grid-column:1;grid-row:2}.pad .down{grid-column:2;grid-row:2}.pad .right{grid-column:3;grid-row:2}.acts{display:flex;align-items:end;gap:6px;pointer-events:auto}.acts button{width:50px;height:50px;font-size:10px;font-weight:800}
+@media(max-width:700px){#mobile{display:flex}#help{display:none}#map{width:105px;height:79px;bottom:126px;right:12px}#hint{bottom:111px;font-size:9px}#logo{top:10px;left:10px}#stats{top:10px;right:10px;min-width:135px;padding:8px 10px}}
+</style>
+</head>
+<body>
+<div id="hud">
+<div id="logo" class="glass">FIELD NOTES<b>BEYOND THE RIDGE</b></div>
+<div id="stats" class="glass">
+<div class="stat"><span>ДИСТАНЦИЯ</span><strong id="dist">0 m</strong></div>
+<div class="stat"><span>СКОРОСТЬ</span><strong id="speed">0 km/h</strong></div>
+<div class="stat"><span>ДОСТАВКИ</span><strong id="finds">0 / 6</strong></div>
+<div class="stat"><span>ТОПЛИВО</span><strong id="fuel">100%</strong></div><div class="stat"><span>ПОКРЫТИЕ</span><strong id="ground">ТРАВА</strong></div>
+</div>
+<div id="help" class="glass">WASD / стрелки — управление<br>SHIFT — пониженная передача 4×4<br>SPACE — ручник · E — лебёдка<br>R — вернуть машину<br>P — пауза</div>
+<div id="hint" class="glass">ДОСТАВЬ ГРУЗЫ НА АВАНПОСТЫ · ЗАПРАВКА ТОЛЬКО НА АВАНПОСТАХ</div>
+<canvas id="map" width="280" height="210"></canvas><div id="toast" class="glass"></div>
+</div>
+<div id="mobile"><div class="pad"><button class="up" data-key="w">▲</button><button class="left" data-key="a">◀</button><button class="down" data-key="s">▼</button><button class="right" data-key="d">▶</button></div><div class="acts"><button data-key="shift">LOW</button><button data-key=" ">HAND</button><button data-key="e">WINCH</button></div></div>
+<div id="menu"><div class="card"><div class="eyebrow">A 3D OFF-ROAD EXPLORATION</div><h1>BEYOND<br>THE RIDGE</h1><p>Доставь грузы на шесть удалённых аванпостов. Топлива хватит только если ехать с умом. Управляй внедорожником, преодолевай холмы, грязь, камни и воду. Подвеска реагирует на рельеф, а лебёдка поможет выбраться из сложных мест.</p><p><b>Управление:</b> WASD / стрелки · SHIFT — 4×4 LOW · SPACE — ручник · E — лебёдка · R — восстановление.</p><button id="start">НАЧАТЬ ПУТЕШЕСТВИЕ →</button><p style="font-size:10px;opacity:.7">Для загрузки 3D-движка требуется интернет.</p></div></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(()=> {
+const $=id=>document.getElementById(id),map=$('map'),mx=map.getContext('2d');
+let scene,camera,renderer,clock,car,body, wheels=[],wheelPivots=[],terrainMesh,water,sun,started=false,paused=false,frame=0;
+const keys={},worldSize=1800,seed=7319,finds=[],outposts=[],trees=[],rocks=[];
+let speed=0,steer=0,fuel=100,elapsed=0,distance=0,collected=0,winch=false,anchor=null,lastToast=0,day=0;
+let pos=new THREE.Vector3(0,0,0),yaw=0,vel=new THREE.Vector3(),camPos=new THREE.Vector3(0,8,15),wheelSpin=0;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), lerp=(a,b,t)=>a+(b-a)*t;
+function rnd(x,z){let n=Math.sin(x*127.1+z*311.7+seed)*43758.5453;return n-Math.floor(n)}
+function noise(x,z){let ix=Math.floor(x),iz=Math.floor(z),fx=x-ix,fz=z-iz;fx=fx*fx*(3-2*fx);fz=fz*fz*(3-2*fz);let a=rnd(ix,iz),b=rnd(ix+1,iz),c=rnd(ix,iz+1),d=rnd(ix+1,iz+1);return (a+(b-a)*fx)*(1-fz)+(c+(d-c)*fx)*fz}
+function heightAt(x,z){let broad=(noise(x*.0024,z*.0024)-.5)*43,mid=(noise(x*.008,z*.008)-.5)*13,small=(noise(x*.025,z*.025)-.5)*2.8;let valley=Math.abs(z-(Math.sin(x*.004)*72+Math.sin(x*.012)*17));let river=clamp((48-valley)/48,0,1);return broad+mid+small-river*7}
+function kindAt(x,z){let valley=Math.abs(z-(Math.sin(x*.004)*72+Math.sin(x*.012)*17));if(valley<24)return 'ВОДА';let n=noise(x*.012+30,z*.012+30);if(n>.72)return 'ГРЯЗЬ';if(n<.18)return 'КАМНИ';return 'ТРАВА'}
+function toast(s){$('toast').textContent=s;$('toast').style.opacity=1;clearTimeout(lastToast);lastToast=setTimeout(()=>$('toast').style.opacity=0,1900)}
+function init(){
+scene=new THREE.Scene();scene.background=new THREE.Color(0xa9bdb0);scene.fog=new THREE.FogExp2(0xa9bdb0,.0012);
+camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,2500);
+renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'low-power'});renderer.setPixelRatio(1);renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;document.body.appendChild(renderer.domElement);
+clock=new THREE.Clock();
+scene.add(new THREE.HemisphereLight(0xdce8d4,0x59604a,2.0));
+sun=new THREE.DirectionalLight(0xffe6bd,2.1);sun.position.set(-180,260,110);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-180;sun.shadow.camera.right=180;sun.shadow.camera.top=180;sun.shadow.camera.bottom=-180;scene.add(sun,sun.target);
+let sky=new THREE.Mesh(new THREE.SphereGeometry(1200,24,16),new THREE.MeshBasicMaterial({color:0x9db6ae,side:THREE.BackSide}));scene.add(sky);
+buildTerrain();buildNature();buildCar();buildOutposts();buildGrass();
+let groundPlane=new THREE.Mesh(new THREE.PlaneGeometry(4000,4000),new THREE.MeshBasicMaterial({color:0x718267}));groundPlane.rotation.x=-Math.PI/2;groundPlane.position.y=-8;scene.add(groundPlane);
+addEventListener('resize',resize);
+}
+function buildTerrain(){
+const N=140,step=worldSize/N,verts=[],colors=[],indices=[];
+for(let z=0;z<=N;z++)for(let x=0;x<=N;x++){let wx=(x/N-.5)*worldSize,wz=(z/N-.5)*worldSize,y=heightAt(wx,wz);verts.push(wx,y,wz);let k=kindAt(wx,wz),c=k==='ВОДА'?new THREE.Color(0x627e75):k==='ГРЯЗЬ'?new THREE.Color(0x79684d):k==='КАМНИ'?new THREE.Color(0x888979):new THREE.Color(0x81916c);let sl=Math.hypot(heightAt(wx+2,wz)-heightAt(wx-2,wz),heightAt(wx,wz+2)-heightAt(wx,wz-2))/4;if(k!=='ВОДА')c.lerp(new THREE.Color(0x6e6a5c),clamp((sl-.28)*2.2,0,.85));let variation=(rnd(x,z)-.5)*.10;c.offsetHSL(0,0,variation);colors.push(c.r,c.g,c.b)}
+for(let z=0;z<N;z++)for(let x=0;x<N;x++){let a=z*(N+1)+x,b=a+1,c=a+N+1,d=c+1;indices.push(a,c,b,b,c,d)}
+let geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geo.setIndex(indices);geo.computeVertexNormals();
+terrainMesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1}));terrainMesh.receiveShadow=true;scene.add(terrainMesh);
+let wp=[],wi=[];for(let i=0;i<=120;i++){let x=-900+i*15,c=Math.sin(x*.004)*72+Math.sin(x*.012)*17;wp.push(x,-2.7,c-26,x,-2.7,c+26);if(i<120){let a=i*2;wi.push(a,a+2,a+1,a+1,a+2,a+3)}}let waterGeo=new THREE.BufferGeometry();waterGeo.setAttribute('position',new THREE.Float32BufferAttribute(wp,3));waterGeo.setIndex(wi);waterGeo.computeVertexNormals();let waterMat=new THREE.MeshStandardMaterial({color:0x3f7478,roughness:.12,metalness:.1,transparent:true,opacity:.82,side:THREE.DoubleSide});water=new THREE.Mesh(waterGeo,waterMat);scene.add(water);
+}
+function buildNature(){const trunkMat=new THREE.MeshStandardMaterial({color:0x554536,roughness:1}),leafMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1});const trunks=new THREE.InstancedMesh(new THREE.CylinderGeometry(.22,.38,3.8,6),trunkMat,1250),leaves=[0,1,2].map(()=>new THREE.InstancedMesh(new THREE.ConeGeometry(2.15,6.2,7),leafMat,1250));const rocks=new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1,0),new THREE.MeshStandardMaterial({color:0x777b70,roughness:1}),350);const d=new THREE.Object3D(),c=new THREE.Color(),lc=[0x476b4e,0x557853,0x617e56,0x3e6349];let n=0,rn=0;for(let i=0;i<1250;i++){let x=(rnd(i,11)-.5)*worldSize*.95,z=(rnd(i,17)-.5)*worldSize*.95;if(Math.abs(z-(Math.sin(x*.004)*72+Math.sin(x*.012)*17))<31)continue;let y=heightAt(x,z),s=.65+rnd(i,19)*1.25;d.position.set(x,y+1.8*s,z);d.scale.setScalar(s);d.updateMatrix();trunks.setMatrixAt(n,d.matrix);for(let j=0;j<3;j++){d.position.set(x,y+(3.3+j*1.35)*s,z);d.scale.set(s*(1-j*.09),s*(1-j*.06),s*(1-j*.09));d.updateMatrix();leaves[j].setMatrixAt(n,d.matrix);leaves[j].setColorAt(n,c.setHex(lc[Math.floor(rnd(i,j+30)*4)]))}trees.push({x,y,z});n++}for(let i=0;i<350;i++){let x=(rnd(i,51)-.5)*worldSize*.94,z=(rnd(i,57)-.5)*worldSize*.94,y=heightAt(x,z),s=1+rnd(i,59)*4;d.position.set(x,y+s*.35,z);d.scale.set(s*1.4,s*.7,s);d.rotation.set(rnd(i,60),rnd(i,61)*3,rnd(i,62));d.updateMatrix();rocks.setMatrixAt(rn++,d.matrix)}trunks.count=n;leaves.forEach(m=>m.count=n);rocks.count=rn;trunks.castShadow=true;leaves.forEach(m=>m.castShadow=true);rocks.castShadow=rocks.receiveShadow=true;scene.add(trunks,rocks,...leaves)}
+function buildNatureOld(){
+const trunkMat=new THREE.MeshStandardMaterial({color:0x554536,roughness:1}),leafMats=[0x476b4e,0x557853,0x617e56,0x3e6349].map(c=>new THREE.MeshStandardMaterial({color:c,roughness:1}));
+const trunkGeo=new THREE.CylinderGeometry(.22,.38,3.8,6),leafGeo=new THREE.ConeGeometry(2.15,6.2,7);
+for(let i=0;i<1250;i++){let x=(rnd(i,11)-.5)*worldSize*.95,z=(rnd(i,17)-.5)*worldSize*.95;if(Math.abs(z-(Math.sin(x*.004)*72+Math.sin(x*.012)*17))<31)continue;let y=heightAt(x,z),s=.65+rnd(i,19)*1.25,g=new THREE.Group();let tr=new THREE.Mesh(trunkGeo,trunkMat);tr.position.y=1.8*s;tr.scale.setScalar(s);tr.castShadow=true;g.add(tr);for(let j=0;j<3;j++){let lf=new THREE.Mesh(leafGeo,leafMats[Math.floor(rnd(i,j+30)*leafMats.length)]);lf.position.y=(3.3+j*1.35)*s;lf.scale.set(s*(1-j*.09),s*(1-j*.06),s*(1-j*.09));lf.castShadow=true;g.add(lf)}g.position.set(x,y,z);scene.add(g);trees.push({x,y,z,group:g})}
+const rockMat=new THREE.MeshStandardMaterial({color:0x777b70,roughness:1});
+for(let i=0;i<350;i++){let x=(rnd(i,51)-.5)*worldSize*.94,z=(rnd(i,57)-.5)*worldSize*.94,y=heightAt(x,z),s=1+rnd(i,59)*4;let r=new THREE.Mesh(new THREE.DodecahedronGeometry(s,0),rockMat);r.position.set(x,y+s*.35,z);r.scale.set(1.4,.7,1);r.rotation.set(rnd(i,60),rnd(i,61)*3,rnd(i,62));r.castShadow=true;r.receiveShadow=true;scene.add(r);rocks.push({x,y,z,r:s})}
+}
+function buildCar(){
+car=new THREE.Group();scene.add(car);
+let chassis=new THREE.Mesh(new THREE.BoxGeometry(2.45,.62,4.3),new THREE.MeshStandardMaterial({color:0x9b8b61,metalness:.18,roughness:.65}));chassis.position.y=1.12;chassis.castShadow=true;chassis.receiveShadow=true;car.add(chassis);body=chassis;
+let cabin=new THREE.Mesh(new THREE.BoxGeometry(2.05,1.15,2.05),new THREE.MeshStandardMaterial({color:0x354d48,roughness:.35,metalness:.2}));cabin.position.set(0,1.92,-.15);cabin.castShadow=true;car.add(cabin);
+let roof=new THREE.Mesh(new THREE.BoxGeometry(2.12,.13,2.12),new THREE.MeshStandardMaterial({color:0xb9aa7b,roughness:.55}));roof.position.set(0,2.52,-.15);roof.castShadow=true;car.add(roof);
+let glass=new THREE.Mesh(new THREE.BoxGeometry(1.85,.73,.06),new THREE.MeshStandardMaterial({color:0x91aaa2,metalness:.25,roughness:.2,transparent:true,opacity:.72}));glass.position.set(0,1.98,1.0);glass.rotation.x=-.15;car.add(glass);
+let bumperMat=new THREE.MeshStandardMaterial({color:0x343a35,metalness:.55,roughness:.45});for(let z of [-2.2,2.2]){let b=new THREE.Mesh(new THREE.BoxGeometry(2.55,.22,.22),bumperMat);b.position.set(0,.83,z);car.add(b)}
+let wheelMat=new THREE.MeshStandardMaterial({color:0x171a18,roughness:.95}),rimMat=new THREE.MeshStandardMaterial({color:0x9c9d8b,metalness:.7,roughness:.35});
+for(let x of [-1.22,1.22])for(let z of [-1.43,1.48]){let pivot=new THREE.Group();pivot.position.set(x,.62,z);car.add(pivot);let tire=new THREE.Mesh(new THREE.CylinderGeometry(.57,.57,.38,18),wheelMat);tire.rotation.z=Math.PI/2;tire.castShadow=true;pivot.add(tire);let rim=new THREE.Mesh(new THREE.CylinderGeometry(.29,.29,.395,12),rimMat);tire.add(rim);wheels.push(tire);wheelPivots.push(pivot)}
+let lightsMat=new THREE.MeshStandardMaterial({color:0xffedc2,emissive:0xffd98a,emissiveIntensity:1.3});for(let x of [-.78,.78]){let l=new THREE.Mesh(new THREE.BoxGeometry(.42,.2,.08),lightsMat);l.position.set(x,1.28,2.18);car.add(l)}
+car.position.set(0,heightAt(0,0),0);
+winchLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),new THREE.LineBasicMaterial({color:0xe4d5a6}));scene.add(winchLine);
+}
+function buildOutposts(){const pole=new THREE.MeshStandardMaterial({color:0x8a8f88,roughness:.5,metalness:.4}),base=new THREE.MeshStandardMaterial({color:0x6d6a5e,roughness:.9});for(let i=0;i<6;i++){let a=i*1.1+.5,r=180+i*120,x=Math.cos(a)*r,z=Math.sin(a)*r;if(kindAt(x,z)==='ВОДА')z+=60;let y=heightAt(x,z),g=new THREE.Group();let b=new THREE.Mesh(new THREE.BoxGeometry(5,2.2,4),base);b.position.y=1.1;b.castShadow=b.receiveShadow=true;g.add(b);let p=new THREE.Mesh(new THREE.CylinderGeometry(.18,.22,11,6),pole);p.position.y=7.5;p.castShadow=true;g.add(p);let lamp=new THREE.Mesh(new THREE.SphereGeometry(.7,10,8),new THREE.MeshStandardMaterial({color:0x444444,emissive:0xff8a2a,emissiveIntensity:1.6}));lamp.position.y=13.2;g.add(lamp);let ring=new THREE.Mesh(new THREE.TorusGeometry(6,.25,6,28),new THREE.MeshBasicMaterial({color:0xff8a2a,transparent:true,opacity:.7}));ring.rotation.x=Math.PI/2;ring.position.y=.3;g.add(ring);g.position.set(x,y,z);scene.add(g);outposts.push({x,y,z,g,lamp,ring})}}
+function buildFindsOld(){const mat=new THREE.MeshStandardMaterial({color:0xd9c998,roughness:.6,metalness:.1,emissive:0x352c17});for(let i=0;i<35;i++){let x=(rnd(i,101)-.5)*worldSize*.82,z=(rnd(i,107)-.5)*worldSize*.82,y=heightAt(x,z)+.7;let g=new THREE.Group();let stone=new THREE.Mesh(new THREE.IcosahedronGeometry(.55,0),mat);stone.scale.set(1,.65,1.25);stone.castShadow=true;g.add(stone);let ring=new THREE.Mesh(new THREE.TorusGeometry(.8,.035,6,20),new THREE.MeshBasicMaterial({color:0xe8d8a1,transparent:true,opacity:.65}));ring.rotation.x=Math.PI/2;g.add(ring);g.position.set(x,y,z);scene.add(g);finds.push({x,y,z,g,got:false})}}
+function buildGrass(){const g=new THREE.ConeGeometry(.09,.7,3);g.translate(0,.35,0);const m=new THREE.InstancedMesh(g,new THREE.MeshStandardMaterial({roughness:1}),8000),d=new THREE.Object3D(),c=new THREE.Color();let n=0;for(let i=0;i<8000;i++){let x=(rnd(i,201)-.5)*worldSize*.9,z=(rnd(i,211)-.5)*worldSize*.9;if(kindAt(x,z)!=='ТРАВА')continue;d.position.set(x,heightAt(x,z),z);d.rotation.set(0,rnd(i,221)*6.28,(rnd(i,231)-.5)*.3);d.scale.set(1,.7+rnd(i,241)*1.1,1);d.updateMatrix();m.setMatrixAt(n,d.matrix);c.setHSL(.22+rnd(i,251)*.05,.4+rnd(i,261)*.2,.3+rnd(i,271)*.14);m.setColorAt(n,c);n++}m.count=n;scene.add(m)}
+function terrainType(){return kindAt(pos.x,pos.z)}
+function recover(){pos.set(0,heightAt(0,0),0);yaw=0;speed=0;vel.set(0,0,0);car.position.copy(pos);car.rotation.set(0,0,0);winch=false;anchor=null;fuel=Math.max(fuel,30);toast('Машина возвращена на стартовую стоянку')}
+function toggleWinch(){if(winch){winch=false;anchor=null;toast('Лебёдка отпущена');return}let best=null,bd=42;for(let t of trees){let d=Math.hypot(t.x-pos.x,t.z-pos.z);if(d<bd){bd=d;best=t}}if(best){winch=true;anchor=best;toast('Лебёдка закреплена! Добавь газ.')}else toast('Нет дерева поблизости для лебёдки')}
+addEventListener('keydown',e=>{let k=e.key.toLowerCase();keys[k]=true;if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(k))e.preventDefault();if(!started)return;if(k==='r')recover();if(k==='e')toggleWinch();if(k==='p'){paused=!paused;toast(paused?'ПАУЗА · нажми P':'ПРОДОЛЖАЕМ')}});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+addEventListener('blur',()=>{for(let k in keys)keys[k]=false});
+document.querySelectorAll('[data-key]').forEach(b=>{let k=b.dataset.key;b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true;b.setPointerCapture(e.pointerId)});['pointerup','pointercancel','lostpointercapture'].forEach(ev=>b.addEventListener(ev,()=>keys[k]=false))});
+function resize(){if(!renderer)return;camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)}
+function update(dt){
+let gas=(keys.w||keys.arrowup)&&fuel>0,brake=keys.s||keys.arrowdown,left=keys.a||keys.arrowleft,right=keys.d||keys.arrowright,low=keys.shift,hand=keys[' '];
+let type=terrainType(),grip=type==='ВОДА'?.3:type==='ГРЯЗЬ'?.52:type==='КАМНИ'?.72:.94;
+if(gas){speed+=(low?20:31)*grip*dt;fuel=Math.max(0,fuel-dt*(low?2.2:1.2))}if(brake)speed-=42*dt;if(!gas&&!brake)speed*=Math.pow(.988,dt*60);if(hand)speed*=Math.pow(.86,dt*60);speed=clamp(speed,-9,low?13:25);
+let steerInput=(right?1:0)-(left?1:0);steer=lerp(steer,steerInput,Math.min(1,dt*5));yaw-=steer*speed*.035*dt*(low?.78:1);
+let old=pos.clone(),forward=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));pos.x+=forward.x*speed*dt;pos.z+=forward.z*speed*dt;
+if(type==='ВОДА'){speed*=.975;if(Math.abs(speed)>7)speed*=.96}
+if(winch&&anchor){let dx=anchor.x-pos.x,dz=anchor.z-pos.z,d=Math.hypot(dx,dz);if(d>4){pos.x+=dx/d*5*dt;pos.z+=dz/d*5*dt;speed=Math.max(speed,2)}}
+let targetY=heightAt(pos.x,pos.z);let slopeX=heightAt(pos.x+1,pos.z)-heightAt(pos.x-1,pos.z),slopeZ=heightAt(pos.x,pos.z+1)-heightAt(pos.x,pos.z-1);pos.y=lerp(pos.y,targetY,Math.min(1,dt*9));
+let travel=Math.hypot(pos.x-old.x,pos.z-old.z);distance+=travel;wheelSpin+=speed*dt*1.7;
+sun.position.set(pos.x-180,260,pos.z+110);sun.target.position.set(pos.x,0,pos.z);car.position.set(pos.x,pos.y,pos.z);car.rotation.order='YXZ';car.rotation.y=yaw;car.rotation.z=clamp(-slopeX*.035,-.22,.22);car.rotation.x=clamp(slopeZ*.035,-.22,.22);
+body.position.y=1.12+Math.sin(wheelSpin*2)*.025+Math.abs(slopeX+slopeZ)*.015;
+for(let i=0;i<wheelPivots.length;i++){let p=wheelPivots[i];p.rotation.y=(i===1||i===3)?-steer*.38:0;wheels[i].rotation.x=wheelSpin}
+if(collected<outposts.length){elapsed+=dt;let o=outposts[collected];if(Math.hypot(o.x-pos.x,o.z-pos.z)<7){collected++;fuel=100;toast(collected<outposts.length?'ГРУЗ ДОСТАВЛЕН · ТОПЛИВО ЗАПРАВЛЕНО':'МАРШРУТ ЗАВЕРШЁН! ВРЕМЯ '+Math.floor(elapsed)+' с')}}outposts.forEach((o,i)=>{o.ring.visible=i===collected;o.lamp.material.emissive.setHex(i<collected?0x47d16a:0xff8a2a)});
+if(winch&&anchor){let a=new THREE.Vector3(pos.x,pos.y+1.4,pos.z),b=new THREE.Vector3(anchor.x,anchor.y+2,anchor.z);winchLine.geometry.setFromPoints([a,b]);winchLine.visible=true}else winchLine.visible=false;
+let back=new THREE.Vector3(-Math.sin(yaw)*12,7.1,-Math.cos(yaw)*12);let desired=pos.clone().add(back);desired.y+=heightAt(desired.x,desired.z)*.15;camPos.lerp(desired,1-Math.pow(.001,dt));camera.position.copy(camPos);let look=pos.clone();look.y+=1.5;camera.lookAt(look);
+let daylight=(Math.sin(performance.now()*.000025)+1)*.5;scene.fog.color.setHSL(.38,.12,.57-daylight*.08);scene.background.copy(scene.fog.color);
+$('dist').textContent=Math.floor(distance)+' m';$('speed').textContent=Math.round(Math.abs(speed)*3.6)+' km/h';$('finds').textContent=collected+' / '+outposts.length;$('fuel').textContent=Math.round(fuel)+'%';$('fuel').style.color=fuel<20?'#ff8a7a':'#fff';if(collected<outposts.length){let o=outposts[collected],dx=o.x-pos.x,dz=o.z-pos.z,rel=Math.atan2(dx,dz)-yaw;rel=Math.atan2(Math.sin(rel),Math.cos(rel));$('hint').textContent='АВАНПОСТ '+(collected+1)+'/'+outposts.length+' · '+Math.round(Math.hypot(dx,dz))+' м '+(Math.abs(rel)<.25?'↑':rel>0?'←':'→')+' · '+Math.floor(elapsed)+' с'}else $('hint').textContent='МАРШРУТ ЗАВЕРШЁН · '+Math.floor(elapsed)+' с'$('ground').textContent=type;
+}
+function drawMap(){mx.fillStyle='#243c32';mx.fillRect(0,0,280,210);for(let x=0;x<280;x+=4)for(let z=0;z<210;z+=4){let wx=pos.x+(x-140)*2.1,wz=pos.z+(z-105)*2.1;if(kindAt(wx,wz)==='ВОДА'){mx.fillStyle='#527e80';mx.fillRect(x,z,4,4)}}mx.fillStyle='#e9d9a5';mx.beginPath();mx.arc(140,105,4,0,7);mx.fill();mx.strokeStyle='#e9d9a5';mx.beginPath();mx.moveTo(140,105);mx.lineTo(140+Math.sin(yaw)*12,105+Math.cos(yaw)*12);mx.stroke();for(let f of outposts){let x=140+(f.x-pos.x)/2.1,z=105+(f.z-pos.z)/2.1;if(x>0&&x<280&&z>0&&z<210){mx.fillStyle='#d5c28d';mx.fillRect(x,z,2,2)}}}
+function loop(){if(!started)return;let dt=Math.min(clock.getDelta(),.04);if(!paused){update(dt);if(++frame%4===0)drawMap()}renderer.render(scene,camera);requestAnimationFrame(loop)}
+$('start').onclick=()=>{if(!window.THREE){toast('Не удалось загрузить 3D-движок. Проверь интернет.');return}if(!scene)init();started=true;$('menu').style.display='none';clock.start();loop()};
+})();
+</script>
+</body></html>
