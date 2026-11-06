@@ -1,0 +1,1105 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f0ead9">
+<title>Почтовый экспресс</title>
+<style>
+  :root { color-scheme: light; --paper:#f0ead9; --sheet:#fbf6e6; --ink:#23372d; --quiet:#637061; --line:#c9c6b0; --top:#246861; --middle:#a74734; --bottom:#866022; --key:#31513e; font-family:system-ui,sans-serif; }
+  * { box-sizing:border-box; }
+  html { min-height:100%; background:var(--paper); }
+  body { margin:0; color:var(--ink); background:repeating-linear-gradient(90deg,#f0ead9 0 7px,#ede7d5 7px 8px); }
+  button { font:inherit; color:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+  button:disabled { cursor:default; }
+  button:focus-visible, canvas:focus-visible { outline:3px solid #8b5736; outline-offset:3px; }
+  canvas:focus { outline:none; }
+  [hidden] { display:none!important; }
+  .symbols { position:absolute; width:0; height:0; overflow:hidden; }
+  .icon { width:1em; height:1em; vertical-align:middle; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .shell { width:min(1180px,calc(100% - 40px)); width:min(1180px,calc(100% - 40px),max(760px,calc((100dvh - 190px) * 2.11))); margin:auto; padding:22px 0 25px; }
+  .masthead { display:flex; align-items:center; justify-content:space-between; gap:18px; margin:0 0 19px; }
+  .brand { display:flex; align-items:center; gap:13px; }
+  .brand-seal { width:48px; height:48px; flex:none; display:grid; place-items:center; color:#f8efd7; background:#344c38; border-radius:13px 13px 13px 3px; box-shadow:inset 0 0 0 1px #23372d; }
+  .brand-seal .icon { width:27px; height:27px; }
+  h1,h2,p { margin:0; }
+  h1 { font:700 clamp(20px,3vw,32px)/1.05 Georgia,serif; letter-spacing:-.02em; }
+  .brand p { margin-top:5px; font-size:11px; color:var(--quiet); }
+  .actions { display:flex; align-items:center; gap:7px; }
+  .tool { border:1px solid var(--line); background:#f9f4e5; width:37px; height:37px; border-radius:7px; display:grid; place-items:center; }
+  .tool .icon { width:18px; height:18px; }
+  .tool:hover { background:#e3e4d3; }
+  .tool:disabled { opacity:.43; }
+  .tool[aria-pressed="true"] { background:#dce2cc; }
+  .panel { background:var(--sheet); border:1px solid #aaa991; border-radius:11px; overflow:hidden; box-shadow:0 5px 0 #e0d9c4; }
+  .status { display:flex; align-items:center; justify-content:space-between; min-height:49px; padding:6px 15px; gap:12px; }
+  .counts { display:flex; align-items:center; gap:17px; min-width:0; }
+  .stat { display:flex; align-items:baseline; gap:6px; white-space:nowrap; font-size:11px; color:var(--quiet); }
+  .stat strong { font-size:16px; font-variant-numeric:tabular-nums; color:var(--ink); }
+  .lives { display:flex; gap:3px; color:var(--middle); font-size:16px; }
+  .lives .icon { fill:currentColor; stroke-width:1.3; }
+  .lives .lost { color:#b5a691; fill:none; }
+  .status-right { display:flex; align-items:center; justify-content:flex-end; gap:12px; }
+  .message { font-size:11px; font-weight:600; color:#315c3d; }
+  .message.error { color:#983c2c; }
+  .next { display:flex; align-items:center; gap:6px; color:var(--quiet); font-size:11px; white-space:nowrap; }
+  .next strong { color:var(--ink); }
+  .destination { display:grid; place-items:center; width:22px; height:22px; flex:none; border-radius:5px; background:var(--tone); color:#fff6e2; }
+  .destination .icon { width:14px; height:14px; fill:none; }
+  [data-station="0"] { --tone:var(--top); --wash:#dce9df; }
+  [data-station="1"] { --tone:var(--middle); --wash:#f2dfd4; }
+  [data-station="2"] { --tone:var(--bottom); --wash:#f0e3c6; }
+  .board { position:relative; width:100%; aspect-ratio:1120/530; border-block:1px solid #aaa991; background:#aeb589; overflow:hidden; }
+  canvas { display:block; width:100%; height:100%; }
+  .switch { position:absolute; z-index:1; top:58.87%; transform:translate(-50%,-50%); display:flex; gap:5px; align-items:center; justify-content:center; min-width:46px; min-height:31px; border:1px solid #455843; border-radius:6px; background:#f4eed7; color:#314737; padding:3px 6px; font-size:11px; font-weight:750; box-shadow:0 2px 0 #5263434a; }
+  .switch span { font-size:15px; line-height:1; }
+  .switch[aria-pressed="true"] { background:#315b47; color:#f9f5e6; }
+  .switch[data-switch="0"] { left:32.59%; }
+  .switch[data-switch="1"] { left:57.59%; }
+  .dialog-shade { position:absolute; z-index:2; inset:0; display:grid; place-items:center; padding:12px; background:#2d3d2855; }
+  .dialog { width:min(385px,100%); max-height:100%; overflow:auto; padding:20px 23px; background:var(--sheet); border:1px solid #958f74; border-radius:9px; box-shadow:0 7px 0 #23372d32; }
+  .dialog h2 { font:700 clamp(21px,4vw,30px)/1.03 Georgia,serif; letter-spacing:-.025em; }
+  .dialog p { font-size:13px; line-height:1.45; color:#4e5b4a; margin:10px 0 14px; }
+  .dialog .ticket { display:flex; align-items:center; gap:7px; color:#8a4330; margin:0 0 9px; font-size:11px; font-weight:750; }
+  .ticket .icon { width:15px; height:15px; }
+  .primary { background:#34543f; color:#fff8e6; border:1px solid #253e2e; border-radius:6px; padding:9px 16px; font-weight:700; font-size:13px; }
+  .primary:hover { background:#244934; }
+  .plain { background:transparent; color:#435242; border:1px solid var(--line); border-radius:6px; padding:9px 12px; font-size:12px; }
+  .dialog-actions { display:flex; flex-wrap:wrap; gap:7px; }
+  .routes { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:10px; }
+  .route { display:flex; align-items:center; gap:9px; min-width:0; min-height:48px; text-align:left; border:1px solid #c8c3a8; border-radius:7px; background:#f6f0dd; padding:7px 10px; }
+  .route .destination { width:28px; height:28px; }
+  .route .destination .icon { width:17px; height:17px; }
+  .route strong { font-size:13px; }
+  .route[aria-pressed="true"] { background:var(--wash); border-color:var(--tone); box-shadow:inset 0 -2px var(--tone); }
+  .route:not(:disabled):hover { border-color:var(--tone); }
+  .route:disabled { opacity:.7; }
+  kbd { margin-left:auto; min-width:21px; height:21px; display:grid; place-items:center; border:1px solid #bfbaa1; border-radius:4px; background:var(--sheet); font:700 11px/1 system-ui,sans-serif; color:#5a6151; }
+  .foot { display:flex; justify-content:space-between; gap:12px; margin-top:12px; color:var(--quiet); font-size:11px; }
+  .foot strong { color:var(--ink); }
+  @media (max-width:690px) {
+    .shell { width:calc(100% - 20px); padding:13px 0 17px; }
+    .masthead { gap:7px; margin-bottom:12px; }
+    .brand { gap:8px; }
+    .brand-seal { width:36px; height:36px; border-radius:9px 9px 9px 2px; }
+    .brand-seal .icon { width:21px; height:21px; }
+    .brand p { display:none; }
+    .actions { gap:4px; }
+    .tool { width:32px; height:32px; }
+    .tool .icon { width:15px; height:15px; }
+    .status { min-height:43px; padding:5px 8px; }
+    .counts,.status-right { gap:8px; }
+    .stat { font-size:10px; gap:3px; }
+    .stat strong { font-size:13px; }
+    .lives { font-size:13px; }
+    .streak,.message,.next-label { display:none; }
+    .next { gap:4px; font-size:10px; }
+    .switch { min-width:30px; min-height:25px; padding:2px 4px; gap:3px; font-size:9px; }
+    .switch span { font-size:12px; }
+    .routes { gap:5px; padding:6px; }
+    .route { min-height:39px; gap:4px; padding:4px; }
+    .route .destination { width:18px; height:18px; }
+    .route .destination .icon { width:12px; height:12px; }
+    .route strong { font-size:10px; }
+    kbd { min-width:15px; height:17px; font-size:9px; }
+    .dialog { padding:10px 13px; }
+    .dialog p { margin:6px 0 8px; font-size:11px; }
+    .dialog .ticket { display:none; }
+    .primary,.plain { padding:6px 9px; font-size:11px; }
+    .foot { font-size:10px; }
+  }
+  @media (max-width:360px) {
+    .brand h1 { font-size:16px; }
+    .next strong,.foot .keys { display:none; }
+    .dialog-shade { padding:7px; }
+  }
+  @media (pointer:coarse) { .foot .keys,kbd { display:none; } }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" class="symbols" aria-hidden="true">
+  <symbol id="train-icon" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="15" rx="3"/><path d="M5 10h14M9 18l-3 3m9-3 3 3M9 14h.1m5.9 0h.1M12 3v7"/></symbol>
+  <symbol id="mail-icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></symbol>
+  <symbol id="heart-icon" viewBox="0 0 24 24"><path d="M12 21C6 16 3 13 3 9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 4-3 7-9 12Z"/></symbol>
+  <symbol id="pine-icon" viewBox="0 0 24 24"><path d="m12 3 6 8h-3l5 6H4l5-6H6l6-8Zm0 14v4"/></symbol>
+  <symbol id="field-icon" viewBox="0 0 24 24"><path d="m12 3 9 9-9 9-9-9 9-9Z"/><path d="M8 12h8"/></symbol>
+  <symbol id="mill-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16M6 6l12 12m0-12L6 18"/></symbol>
+  <symbol id="pause-icon" viewBox="0 0 24 24"><path d="M8 5v14m8-14v14"/></symbol>
+  <symbol id="play-icon" viewBox="0 0 24 24"><path d="m8 5 12 7-12 7Z"/></symbol>
+  <symbol id="sound-icon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3Zm13-1a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></symbol>
+  <symbol id="mute-icon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3Zm13 0 5 6m0-6-5 6"/></symbol>
+  <symbol id="full-icon" viewBox="0 0 24 24"><path d="M9 4H4v5m11-5h5v5m0 6v5h-5m-6 0H4v-5"/></symbol>
+</svg>
+<main class="shell">
+  <header class="masthead">
+    <div class="brand"><div class="brand-seal"><svg class="icon" aria-hidden="true"><use href="#train-icon"/></svg></div><div><h1>Почтовый экспресс</h1><p>Диспетчерская игра</p></div></div>
+    <div class="actions">
+      <button class="tool" id="pause" type="button" title="Пауза (Esc)" aria-label="Пауза" disabled><svg class="icon" aria-hidden="true"><use href="#pause-icon"/></svg></button>
+      <button class="tool" id="sound" type="button" title="Звук" aria-label="Звук" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#sound-icon"/></svg></button>
+      <button class="tool" id="fullscreen" type="button" title="Полный экран (F)" aria-label="Полный экран" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#full-icon"/></svg></button>
+    </div>
+  </header>
+  <section class="panel" aria-label="Железная дорога">
+    <div class="status">
+      <div class="counts">
+        <div class="lives" id="lives" aria-label="Осталось три жизни"><svg class="icon" aria-hidden="true"><use href="#heart-icon"/></svg><svg class="icon" aria-hidden="true"><use href="#heart-icon"/></svg><svg class="icon" aria-hidden="true"><use href="#heart-icon"/></svg></div>
+        <span class="stat">Очки <strong id="score">0</strong></span>
+        <span class="stat streak">Серия <strong id="streak">0</strong></span>
+        <span class="stat">Уровень <strong id="level">1</strong></span>
+      </div>
+      <div class="status-right">
+        <span id="message" class="message" role="status"></span>
+        <div class="next" id="next" hidden><span class="next-label">Следующий</span><span class="destination" id="next-destination" data-station="0"><svg class="icon" aria-hidden="true"><use id="next-icon" href="#pine-icon"/></svg></span><strong id="next-name">Сосны</strong></div>
+      </div>
+    </div>
+    <div class="board">
+      <canvas id="board" tabindex="0" aria-label="Карта железной дороги. Клавиши 1, 2 и 3 выбирают станцию, Q и E переключают стрелки."></canvas>
+      <button class="switch" data-switch="0" type="button" title="Верхняя стрелка (Q)" aria-label="Верхняя стрелка" aria-pressed="false" hidden>Q <span aria-hidden="true">→</span></button>
+      <button class="switch" data-switch="1" type="button" title="Нижняя стрелка (E)" aria-label="Нижняя стрелка" aria-pressed="false" hidden>E <span aria-hidden="true">→</span></button>
+      <div class="dialog-shade" id="overlay">
+        <div class="dialog" id="menu">
+          <p class="ticket"><svg class="icon" aria-hidden="true"><use href="#mail-icon"/></svg> Три станции</p>
+          <h2>Почта на рельсах</h2>
+          <p>Смотри на знак на вагоне и выбирай нужную станцию кнопкой внизу или клавишей 1, 2 или 3. После трёх ошибок смена закончится.</p>
+          <button class="primary" id="start" type="button">Начать смену</button>
+        </div>
+        <div class="dialog" id="paused" hidden>
+          <h2>Пауза</h2><p>Поезда дождутся тебя.</p>
+          <div class="dialog-actions"><button class="primary" id="resume" type="button">Продолжить</button><button class="plain" id="restart" type="button">Начать заново</button></div>
+        </div>
+        <div class="dialog" id="over" hidden>
+          <h2>Смена окончена</h2><p id="summary"></p>
+          <button class="primary" id="again" type="button">Новая смена</button>
+        </div>
+      </div>
+    </div>
+    <div class="routes" aria-label="Маршрут поезда">
+      <button class="route" data-station="0" type="button" aria-pressed="false" disabled><span class="destination"><svg class="icon" aria-hidden="true"><use href="#pine-icon"/></svg></span><strong>Сосны</strong><kbd>1</kbd></button>
+      <button class="route" data-station="1" type="button" aria-pressed="true" disabled><span class="destination"><svg class="icon" aria-hidden="true"><use href="#field-icon"/></svg></span><strong>Луг</strong><kbd>2</kbd></button>
+      <button class="route" data-station="2" type="button" aria-pressed="false" disabled><span class="destination"><svg class="icon" aria-hidden="true"><use href="#mill-icon"/></svg></span><strong>Мельница</strong><kbd>3</kbd></button>
+    </div>
+  </section>
+  <div class="foot"><span>Доставлено <strong id="delivered">0</strong> · Рекорд <strong id="best">0</strong></span><span class="keys">Q / E — стрелки · Esc — пауза</span></div>
+</main>
+<noscript>Для игры нужен JavaScript.</noscript>
+<script>
+(() => {
+  'use strict';
+
+  const STORAGE_KEY = 'postal-express-best';
+  const ENTRY_X = -50;
+  const EXIT_X = 1040;
+  const MIDDLE_Y = 270;
+  const FIRST_SWITCH_X = 365;
+  const SECOND_SWITCH_X = 645;
+  const CURVE_WIDTH = 170;
+  const STATION_Y = [110, MIDDLE_Y, 420];
+  const FIRST_DEPARTURE = 2.5;
+  const DELIVERIES_PER_LEVEL = 6;
+
+  class PostalExpressGame {
+    constructor({ onUpdate, onEvent, random = Math.random } = {}) {
+      this.onUpdate = onUpdate;
+      this.onEvent = onEvent;
+      this.random = random;
+      this.best = 0;
+      try {
+        const savedBest = Number(localStorage.getItem(STORAGE_KEY));
+        if (Number.isFinite(savedBest) && savedBest > 0) this.best = Math.floor(savedBest);
+      } catch { /* Storage can be unavailable for a local file. */ }
+      this.reset('menu');
+    }
+
+    reset(mode) {
+      this.mode = mode;
+      this.time = 0;
+      this.score = 0;
+      this.delivered = 0;
+      this.misses = 0;
+      this.lives = 3;
+      this.streak = 0;
+      this.level = 1;
+      this.switches = [false, false];
+      this.trains = [];
+      this.nextId = 1;
+      this.nextTarget = 0;
+      this.repeatedTarget = 1;
+      this.nextDepartureAt = FIRST_DEPARTURE;
+      this.updatePace();
+    }
+
+    updatePace() {
+      // All active trains share a speed, so the following train cannot catch up.
+      // A minimum gap of 452 board units leaves time between B and the next A.
+      const pressure = 1 - Math.exp(-(this.level - 1) / 9);
+      this.speed = 152 + 118 * pressure;
+      this.departureGap = 500 - 48 * pressure;
+    }
+
+    start() {
+      this.reset('playing');
+      this.notify();
+    }
+
+    pause() {
+      if (this.mode !== 'playing') return false;
+      this.mode = 'paused';
+      this.notify();
+      return true;
+    }
+
+    togglePause() {
+      if (this.mode !== 'paused') return this.pause();
+      this.mode = 'playing';
+      this.notify();
+      return true;
+    }
+
+    toggleSwitch(index) {
+      if (this.mode !== 'playing' || (index !== 0 && index !== 1)) return false;
+      this.switches[index] = !this.switches[index];
+      this.emit('switch', { index, switches: this.switches.slice() });
+      this.notify();
+      return true;
+    }
+
+    setRoute(target) {
+      if (this.mode !== 'playing' || !Number.isInteger(target) || target < 0 || target > 2) return false;
+      const first = target === 0;
+      // A top train bypasses B. Leave B alone for any train already beyond A.
+      const second = first ? this.switches[1] : target === 2;
+      if (first === this.switches[0] && second === this.switches[1]) return false;
+      this.switches[0] = first;
+      this.switches[1] = second;
+      this.emit('switch', { index: null, target, switches: this.switches.slice() });
+      this.notify();
+      return true;
+    }
+
+    getState() {
+      return {
+        mode: this.mode,
+        time: this.time,
+        score: this.score,
+        delivered: this.delivered,
+        misses: this.misses,
+        lives: this.lives,
+        streak: this.streak,
+        level: this.level,
+        best: this.best,
+        switches: this.switches.slice(),
+        trains: this.trains.map(train => ({ ...train })),
+        nextTarget: this.nextTarget,
+        nextIn: Math.max(0, this.nextDepartureAt - this.time)
+      };
+    }
+
+    notify() { this.onUpdate?.(this.getState()); }
+
+    emit(type, details) {
+      this.onEvent?.({
+        type, time: this.time, score: this.score, best: this.best,
+        delivered: this.delivered, misses: this.misses, lives: this.lives,
+        streak: this.streak, level: this.level, ...details
+      });
+    }
+
+    depart() {
+      this.trains.push({
+        id: this.nextId++, x: ENTRY_X, y: MIDDLE_Y, angle: 0,
+        target: this.nextTarget, route: null
+      });
+      let target = Math.floor(this.random() * STATION_Y.length);
+      if (target === this.nextTarget && this.repeatedTarget === 2) {
+        // Keep the queue varied without introducing a retry loop around random().
+        target = (target + 1 + Math.floor(this.random() * 2)) % STATION_Y.length;
+      }
+      this.repeatedTarget = target === this.nextTarget ? this.repeatedTarget + 1 : 1;
+      this.nextTarget = target;
+      this.nextDepartureAt = this.time + this.departureGap / this.speed;
+    }
+
+    advanceTrain(train, x) {
+      // The order matters when a single tick passes both junctions.
+      if (train.route === null && train.x < FIRST_SWITCH_X && x >= FIRST_SWITCH_X && this.switches[0]) {
+        train.route = 0;
+      }
+      if (train.route === null && train.x < SECOND_SWITCH_X && x >= SECOND_SWITCH_X) {
+        train.route = this.switches[1] ? 2 : 1;
+      }
+      train.x = x;
+      if (train.route !== 0 && train.route !== 2) return;
+
+      const curveStart = train.route === 0 ? FIRST_SWITCH_X : SECOND_SWITCH_X;
+      const progress = Math.min(1, Math.max(0, (x - curveStart) / CURVE_WIDTH));
+      const offset = STATION_Y[train.route] - MIDDLE_Y;
+      train.y = MIDDLE_Y + offset * progress * progress * (3 - 2 * progress);
+      train.angle = Math.atan(offset * 6 * progress * (1 - progress) / CURVE_WIDTH);
+    }
+
+    arrive(train) {
+      const details = { id: train.id, target: train.target, route: train.route };
+      if (train.target === train.route) {
+        this.delivered++;
+        this.streak++;
+        const points = 100 + 20 * (this.streak - 1);
+        this.score += points;
+        if (this.score > this.best) {
+          this.best = this.score;
+          try { localStorage.setItem(STORAGE_KEY, String(this.best)); } catch { /* Play can continue without storage. */ }
+        }
+        const previousLevel = this.level;
+        this.level = 1 + Math.floor(this.delivered / DELIVERIES_PER_LEVEL);
+        if (this.level !== previousLevel) this.updatePace();
+        this.emit('delivery', { ...details, points });
+        if (this.level !== previousLevel) this.emit('level', details);
+      } else {
+        this.misses++;
+        this.lives--;
+        this.streak = 0;
+        if (this.lives === 0) this.mode = 'over';
+        this.emit('miss', details);
+        if (this.mode === 'over') this.emit('over', details);
+      }
+    }
+
+    tick(dt) {
+      if (this.mode !== 'playing' || !Number.isFinite(dt) || dt <= 0) return;
+      let remaining = dt;
+      // Process arrivals and departures in time order even if the browser frame is late.
+      while (remaining > 0 && this.mode === 'playing') {
+        const lead = this.trains[0];
+        const untilArrival = lead ? Math.max(0, (EXIT_X - lead.x) / this.speed) : Infinity;
+        const untilDeparture = Math.max(0, this.nextDepartureAt - this.time);
+        const step = Math.min(remaining, untilArrival, untilDeparture);
+        const arriving = untilArrival === step;
+        this.time += step;
+        remaining -= step;
+        const travel = step * this.speed;
+        for (const train of this.trains) {
+          const x = arriving && train === lead ? EXIT_X : Math.min(EXIT_X, train.x + travel);
+          this.advanceTrain(train, x);
+        }
+        if (arriving) this.arrive(this.trains.shift());
+        if (untilDeparture === step && this.mode === 'playing') this.depart();
+      }
+      this.notify();
+    }
+  }
+
+  window.PostalExpressGame = PostalExpressGame;
+})();
+
+</script>
+<script>
+/* Postal Express scenery and train renderer. Coordinates match the simulation. */
+(() => {
+  'use strict';
+
+  const WIDTH = 1120;
+  const HEIGHT = 530;
+  const MAIN_Y = 270;
+  const TAU = Math.PI * 2;
+  const routes = [
+    { start: 365, end: 535, y: 110, color: '#246861', dark: '#164943', name: 'СОСНЫ' },
+    { start: -20, end: -20, y: MAIN_Y, color: '#b34b36', dark: '#78382e', name: 'ЛУГ' },
+    { start: 645, end: 815, y: 420, color: '#ae7627', dark: '#6e4c23', name: 'МЕЛЬНИЦА' },
+  ];
+
+  function routeY(route, x) {
+    if (route.y === MAIN_Y || x >= route.end) return route.y;
+    if (x <= route.start) return MAIN_Y;
+    const t = (x - route.start) / (route.end - route.start);
+    return MAIN_Y + (route.y - MAIN_Y) * t * t * (3 - 2 * t);
+  }
+
+  function routeAngle(route, x) {
+    if (route.y === MAIN_Y || x <= route.start || x >= route.end) return 0;
+    const t = (x - route.start) / (route.end - route.start);
+    return Math.atan((route.y - MAIN_Y) * 6 * t * (1 - t) / (route.end - route.start));
+  }
+
+  function rounded(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function ellipse(ctx, x, y, rx, ry, color) {
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, TAU);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  function polygon(ctx, points, color) {
+    ctx.beginPath();
+    ctx.moveTo(points[0][0], points[0][1]);
+    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  function stroke(ctx, color, width) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.stroke();
+  }
+
+  function seededRandom() {
+    let seed = 20391;
+    return () => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+  }
+
+  function symbol(ctx, target, x, y, size, color) {
+    ctx.fillStyle = color;
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    if (target === 0) {
+      ctx.moveTo(x, y - size);
+      ctx.lineTo(x + size * 0.95, y + size * 0.68);
+      ctx.lineTo(x - size * 0.95, y + size * 0.68);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillRect(x - size * 0.13, y + size * 0.6, size * 0.26, size * 0.38);
+    } else if (target === 1) {
+      ctx.moveTo(x, y - size);
+      ctx.lineTo(x + size * 0.8, y);
+      ctx.lineTo(x, y + size);
+      ctx.lineTo(x - size * 0.8, y);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.arc(x, y, size * 0.82, 0, TAU);
+      ctx.lineWidth = size * 0.23;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x - size * 0.78, y);
+      ctx.lineTo(x + size * 0.78, y);
+      ctx.moveTo(x, y - size * 0.78);
+      ctx.lineTo(x, y + size * 0.78);
+      ctx.stroke();
+      ellipse(ctx, x, y, size * 0.24, size * 0.24, color);
+    }
+  }
+
+  function pine(ctx, x, y, scale, variant) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    ellipse(ctx, 6, 1, 21, 8, '#4655402b');
+    ctx.fillStyle = '#776648';
+    ctx.fillRect(-3, -18, 6, 20);
+    const shades = variant ? ['#4c6549', '#567251', '#64805d'] : ['#304d3d', '#3b5a47', '#537259'];
+    polygon(ctx, [[0, -54], [19, -12], [14, -10], [21, -5], [2, 0], [-21, -5], [-14, -12], [-19, -13]], shades[0]);
+    polygon(ctx, [[0, -62], [15, -30], [13, -29], [17, -22], [-3, -17], [-16, -23], [-12, -28], [-14, -31]], shades[1]);
+    polygon(ctx, [[0, -66], [12, -39], [2, -42], [-11, -38]], shades[2]);
+    ctx.restore();
+  }
+
+  function shrub(ctx, x, y, size, variant) {
+    ellipse(ctx, x + 4, y + 4, size * 1.1, size * 0.43, '#46554029');
+    ellipse(ctx, x, y - 2, size, size * 0.63, variant ? '#789164' : '#627d57');
+    ellipse(ctx, x - size * 0.31, y - size * 0.34, size * 0.53, size * 0.39, variant ? '#93a879' : '#80986c');
+  }
+
+  function field(ctx, x, y, w, h, angle) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    rounded(ctx, 3, 6, w, h, 13);
+    ctx.fillStyle = '#8c814c2b';
+    ctx.fill();
+    rounded(ctx, 0, 0, w, h, 13);
+    ctx.fillStyle = '#d2b670';
+    ctx.fill();
+    ctx.clip();
+    for (let i = -3; i < w / 12 + 3; i++) {
+      const row = i * 12;
+      ctx.beginPath();
+      ctx.moveTo(row, -5);
+      ctx.bezierCurveTo(row - 9, h * 0.26, row + 9, h * 0.67, row + 6, h + 5);
+      stroke(ctx, i % 2 ? '#b89452' : '#ebd297', 2.7);
+      ctx.beginPath();
+      for (let j = 10; j < h; j += 14) {
+        const offset = Math.sin(j * 0.08) * 4;
+        ctx.moveTo(row + offset - 3, j + 2);
+        ctx.lineTo(row + offset + 1, j - 3);
+        ctx.lineTo(row + offset + 4, j - 1);
+      }
+      stroke(ctx, '#eed6a04f', 1.25);
+    }
+    ctx.restore();
+    rounded(ctx, 0, 0, 1, 1, 0);
+  }
+
+  function river(ctx) {
+    const bed = () => {
+      ctx.beginPath();
+      ctx.moveTo(205, -38);
+      ctx.bezierCurveTo(144, 36, 116, 97, 129, 165);
+      ctx.bezierCurveTo(146, 224, 214, 244, 197, 300);
+      ctx.bezierCurveTo(183, 353, 113, 379, 128, 436);
+      ctx.bezierCurveTo(138, 474, 154, 496, 112, 571);
+    };
+    ctx.lineCap = 'round';
+    bed(); stroke(ctx, '#a3b18a', 55);
+    bed(); stroke(ctx, '#728e7c', 44);
+    bed(); stroke(ctx, '#8fae9d', 39);
+    bed(); stroke(ctx, '#a5bfae70', 22);
+    const ripples = [[176, 42], [138, 86], [130, 145], [144, 187], [171, 220], [197, 324], [167, 353], [135, 384], [129, 433], [147, 477], [132, 519]];
+    ctx.beginPath();
+    for (let i = 0; i < ripples.length; i++) {
+      const [x, y] = ripples[i];
+      ctx.moveTo(x - 11, y);
+      ctx.quadraticCurveTo(x - 4, y - 5, x + 10, y - 2);
+      ctx.moveTo(x - 2, y + 7);
+      ctx.lineTo(x + 9, y + 5);
+    }
+    stroke(ctx, '#e6e8cead', 1.5);
+    ctx.lineCap = 'butt';
+  }
+
+  function drawHouse(ctx, x, y, w, h, wall, roof, shade) {
+    polygon(ctx, [[x + 7, y + 11], [x + w + 13, y + 9], [x + w + 12, y + h + 8], [x + 6, y + h + 11]], '#52564235');
+    ctx.fillStyle = wall;
+    ctx.fillRect(x + 3, y + h * 0.39, w - 6, h * 0.61);
+    ctx.fillStyle = '#917d5d';
+    ctx.fillRect(x + 3, y + h - 4, w - 6, 4);
+    polygon(ctx, [[x, y + 10], [x + 10, y], [x + w - 8, y], [x + w, y + 11], [x + w - 2, y + h * 0.53], [x + 1, y + h * 0.54]], roof);
+    polygon(ctx, [[x, y + 10], [x + w, y + 10], [x + w - 2, y + h * 0.53], [x + 1, y + h * 0.54]], shade);
+    ctx.strokeStyle = '#f1dab550';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 8; i < w - 3; i += 7) {
+      ctx.moveTo(x + i, y + 12);
+      ctx.lineTo(x + i - 2, y + h * 0.5);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#4c554b';
+    ctx.fillRect(x + w * 0.45, y + h * 0.64, 9, h * 0.29);
+    ctx.fillStyle = '#64837b';
+    ctx.fillRect(x + 11, y + h * 0.64, 9, 6);
+    ctx.fillRect(x + w - 21, y + h * 0.64, 9, 6);
+    ctx.fillStyle = '#f1d7a8';
+    ctx.fillRect(x + 15, y + h * 0.64, 1, 6);
+    ctx.fillRect(x + w - 17, y + h * 0.64, 1, 6);
+  }
+
+  function station(ctx, target) {
+    const route = routes[target];
+    const y = route.y;
+    rounded(ctx, 879, y - 33, 210, 27, 4);
+    ctx.fillStyle = '#9c8a66';
+    ctx.fill();
+    rounded(ctx, 879, y - 36, 210, 26, 4);
+    ctx.fillStyle = '#ddc99e';
+    ctx.fill();
+    ctx.fillStyle = '#f1e3bd';
+    ctx.fillRect(886, y - 14, 197, 3);
+    ctx.fillStyle = '#bd9e75';
+    for (let x = 893; x < 1088; x += 13) ctx.fillRect(x, y - 33, 1, 17);
+    drawHouse(ctx, 887, y - 83, 71, 51, '#e8d7ad', route.color, route.dark);
+    ctx.fillStyle = '#634f37';
+    ctx.fillRect(973, y - 42, 3, 15);
+    ctx.fillRect(1070, y - 42, 3, 15);
+    rounded(ctx, 965, y - 68, 116, 30, 4);
+    ctx.fillStyle = '#7a69543f';
+    ctx.fill();
+    rounded(ctx, 964, y - 71, 116, 30, 4);
+    ctx.fillStyle = '#faf0d4';
+    ctx.fill();
+    stroke(ctx, route.dark, 1.4);
+    rounded(ctx, 968, y - 67, 22, 22, 3);
+    ctx.fillStyle = route.color;
+    ctx.fill();
+    symbol(ctx, target, 979, y - 56, 6.8, '#fff2d5');
+    ctx.fillStyle = '#404940';
+    ctx.font = '800 12px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(route.name, 997, y - 55.5);
+    ctx.fillStyle = '#7b694b';
+    ctx.fillRect(1047, y - 29, 24, 4);
+    ctx.fillRect(1051, y - 24, 16, 2);
+    ellipse(ctx, 878, y - 23, 7, 4, '#7d8e60');
+  }
+
+  function windmill(ctx) {
+    const x = 1025, y = 503;
+    ellipse(ctx, x + 8, y, 31, 10, '#58664734');
+    polygon(ctx, [[x - 16, y], [x - 9, y - 48], [x + 9, y - 48], [x + 16, y]], '#e4d4a8');
+    polygon(ctx, [[x + 1, y], [x + 4, y - 48], [x + 9, y - 48], [x + 16, y]], '#b9a578');
+    polygon(ctx, [[x - 12, y - 46], [x - 2, y - 62], [x + 11, y - 46]], '#976a43');
+    ctx.fillStyle = '#76624b';
+    ctx.fillRect(x - 5, y - 14, 9, 14);
+    ctx.save();
+    ctx.translate(x, y - 39);
+    ctx.rotate(Math.PI / 7);
+    for (let i = 0; i < 4; i++) {
+      ctx.rotate(Math.PI / 2);
+      ctx.fillStyle = '#594e3c';
+      ctx.fillRect(-1, -35, 2, 37);
+      ctx.fillStyle = '#eae1ba';
+      ctx.fillRect(1, -34, 6, 23);
+      ctx.fillStyle = '#9b865e';
+      for (let j = -30; j < -13; j += 5) ctx.fillRect(1, j, 6, 1);
+    }
+    ellipse(ctx, 0, 0, 4, 4, '#5a5544');
+    ctx.restore();
+  }
+
+  function trackPath(ctx, route) {
+    ctx.beginPath();
+    ctx.moveTo(route.start, MAIN_Y);
+    if (route.y !== MAIN_Y) {
+      const third = (route.end - route.start) / 3;
+      ctx.bezierCurveTo(route.start + third, MAIN_Y, route.end - third, route.y, route.end, route.y);
+    }
+    ctx.lineTo(WIDTH + 30, route.y);
+  }
+
+  function drawTrack(ctx, route) {
+    trackPath(ctx, route); stroke(ctx, '#978767', 33);
+    trackPath(ctx, route); stroke(ctx, '#b6a57f', 29);
+    for (let x = route.start + 5; x < WIDTH + 10; x += 11.5) {
+      const angle = routeAngle(route, x);
+      const y = routeY(route, x);
+      const nx = -Math.sin(angle) * 11.7, ny = Math.cos(angle) * 11.7;
+      ctx.beginPath();
+      ctx.moveTo(x - nx, y - ny + 0.7);
+      ctx.lineTo(x + nx, y + ny + 0.7);
+      stroke(ctx, '#675744', 3.5);
+      ctx.beginPath();
+      ctx.moveTo(x - nx, y - ny - 0.4);
+      ctx.lineTo(x + nx, y + ny - 0.4);
+      stroke(ctx, '#997b53', 2.3);
+    }
+    for (const offset of [-7.5, 7.5]) {
+      ctx.beginPath();
+      for (let x = route.start; x <= WIDTH + 28; x += 4) {
+        const angle = routeAngle(route, x);
+        const px = x - Math.sin(angle) * offset;
+        const py = routeY(route, x) + Math.cos(angle) * offset;
+        if (x === route.start) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      stroke(ctx, '#49463f', 3.8);
+      stroke(ctx, '#ded1ad', 1.45);
+    }
+  }
+
+  function bridge(ctx) {
+    ctx.fillStyle = '#62574558';
+    ctx.fillRect(156, MAIN_Y - 16, 87, 39);
+    ctx.fillStyle = '#8f7656';
+    ctx.fillRect(157, MAIN_Y - 17, 85, 34);
+    ctx.fillStyle = '#bc9c70';
+    for (let x = 160; x < 242; x += 6) ctx.fillRect(x, MAIN_Y - 15, 4.5, 30);
+    for (const y of [MAIN_Y - 15, MAIN_Y + 15]) {
+      ctx.fillStyle = '#645c48';
+      ctx.fillRect(156, y - 2, 87, 4);
+      ctx.fillStyle = '#dfc59a';
+      ctx.fillRect(157, y - 2, 85, 1.3);
+      for (let x = 158; x < 244; x += 14) ctx.fillRect(x, y - 4, 3, 8);
+    }
+    for (const y of [MAIN_Y - 7.5, MAIN_Y + 7.5]) {
+      ctx.fillStyle = '#49463f'; ctx.fillRect(156, y - 1.9, 88, 3.8);
+      ctx.fillStyle = '#ded1ad'; ctx.fillRect(156, y - 0.7, 88, 1.4);
+    }
+  }
+
+  function createScenery(ctx) {
+    const random = seededRandom();
+    ctx.fillStyle = '#c9c596';
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    ctx.fillStyle = '#d9cda1';
+    ctx.beginPath();
+    ctx.moveTo(0, 190);
+    ctx.bezierCurveTo(148, 198, 192, 111, 353, 131);
+    ctx.bezierCurveTo(520, 154, 529, 287, 732, 306);
+    ctx.bezierCurveTo(875, 322, 962, 276, 1120, 284);
+    ctx.lineTo(1120, 530); ctx.lineTo(0, 530); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#b2ba8b';
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(369, 0);
+    ctx.bezierCurveTo(310, 29, 287, 72, 216, 80);
+    ctx.bezierCurveTo(124, 86, 129, 205, 0, 178);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#b8bf8f';
+    ctx.beginPath();
+    ctx.moveTo(267, 530);
+    ctx.bezierCurveTo(296, 442, 338, 376, 454, 369);
+    ctx.bezierCurveTo(530, 358, 597, 425, 645, 451);
+    ctx.bezierCurveTo(680, 473, 674, 510, 710, 530);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#b4bd8e';
+    ctx.beginPath();
+    ctx.moveTo(441, 0); ctx.lineTo(925, 0);
+    ctx.bezierCurveTo(877, 43, 795, 76, 690, 75);
+    ctx.bezierCurveTo(590, 82, 533, 47, 441, 0);
+    ctx.closePath(); ctx.fill();
+
+    for (let i = 0; i < 5300; i++) {
+      ctx.fillStyle = i % 3 ? '#faf0be31' : '#66784b23';
+      ctx.fillRect(random() * WIDTH, random() * HEIGHT, 0.8 + random() * 1.5, 0.8 + random() * 1.05);
+    }
+
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(1106, 37); ctx.bezierCurveTo(1078, 13, 1029, 8, 948, 31);
+    ctx.moveTo(1117, 183); ctx.bezierCurveTo(1076, 163, 984, 153, 960, 195);
+    ctx.moveTo(1112, 510); ctx.bezierCurveTo(1092, 469, 982, 498, 921, 455);
+    stroke(ctx, '#b9a67972', 10); stroke(ctx, '#e8dbb3', 6);
+    ctx.lineCap = 'butt';
+    river(ctx);
+    field(ctx, 261, 49, 113, 87, -0.12);
+    field(ctx, 574, 165, 207, 62, -0.045);
+    field(ctx, 758, 457, 178, 76, 0.075);
+    field(ctx, 19, 341, 71, 101, 0.1);
+
+    const trees = [];
+    for (const [x, y, rx, ry, count] of [[68, 98, 61, 75, 31], [578, 24, 130, 32, 27], [811, 29, 52, 37, 15], [382, 465, 132, 62, 34], [551, 486, 74, 46, 14], [1089, 496, 44, 33, 8]]) {
+      for (let i = 0; i < count; i++) {
+        const angle = random() * TAU, r = Math.sqrt(random());
+        trees.push([x + Math.cos(angle) * rx * r, y + Math.sin(angle) * ry * r, 0.42 + random() * 0.55, i % 3 === 0]);
+      }
+    }
+    trees.sort((a, b) => a[1] - b[1]);
+    for (const [x, y, s, v] of trees) pine(ctx, x, y, s, v);
+    for (const [x, y, size] of [[214, 106, 13], [244, 154, 10], [103, 209, 10], [93, 327, 14], [171, 349, 8], [221, 395, 10], [577, 337, 14], [612, 363, 10], [796, 166, 12], [836, 184, 8], [848, 317, 12], [1095, 208, 11], [864, 382, 9], [653, 445, 11], [487, 208, 10], [474, 113, 12], [936, 466, 7], [756, 336, 11]]) {
+      shrub(ctx, x, y, size, random() > 0.5);
+    }
+
+    for (let i = 0; i < 110; i++) {
+      const x = random() * WIDTH, y = random() * HEIGHT;
+      if (Math.abs(y - MAIN_Y) < 28 || Math.abs(y - routeY(routes[0], x)) < 24 || Math.abs(y - routeY(routes[2], x)) < 24) continue;
+      if (x > 880 && y < 445) continue;
+      ctx.beginPath();
+      ctx.moveTo(x - 2, y + 1); ctx.lineTo(x - 3, y - 3); ctx.moveTo(x - 2, y + 1); ctx.lineTo(x + 1, y - 2);
+      stroke(ctx, '#77885b6e', 0.9);
+    }
+
+    windmill(ctx);
+    for (let target = 0; target < routes.length; target++) station(ctx, target);
+    for (const route of routes) drawTrack(ctx, route);
+    bridge(ctx);
+  }
+
+  function activeTurnout(ctx, index, diverted) {
+    const branch = routes[index === 0 ? 0 : 2];
+    const route = diverted ? branch : routes[1];
+    const start = branch.start;
+    const end = start + 96;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(start - 12, MAIN_Y);
+    for (let x = start; x <= end; x += 4) ctx.lineTo(x, routeY(route, x));
+    stroke(ctx, '#53694f', 5.2);
+    stroke(ctx, '#e9d395', 2.4);
+    const arrowX = end + 4;
+    ctx.save();
+    ctx.translate(arrowX, routeY(route, arrowX));
+    ctx.rotate(routeAngle(route, arrowX));
+    polygon(ctx, [[-5, -4], [4, 0], [-5, 4]], '#e9d395');
+    ctx.restore();
+    ctx.lineCap = 'butt';
+
+    const signalX = start - 15, signalY = MAIN_Y - 25;
+    ellipse(ctx, signalX + 2, signalY + 7, 10, 5, '#52564240');
+    rounded(ctx, signalX - 10, signalY - 7, 20, 14, 4);
+    ctx.fillStyle = '#494b3f';
+    ctx.fill();
+    ellipse(ctx, signalX - 4.3, signalY, 2.8, 2.8, diverted ? '#82775d' : '#e6c381');
+    ellipse(ctx, signalX + 4.3, signalY, 2.8, 2.8, diverted ? '#e6c381' : '#82775d');
+  }
+
+  function drawMailCar(ctx, x, y, angle, color, dark, target) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+    rounded(ctx, -17, -8, 35, 21, 4); ctx.fillStyle = '#30352d56'; ctx.fill();
+    ctx.fillStyle = '#343b36';
+    ctx.fillRect(-13, -13, 6, 26); ctx.fillRect(7, -13, 6, 26);
+    rounded(ctx, -18, -11, 36, 22, 4); ctx.fillStyle = dark; ctx.fill();
+    rounded(ctx, -16, -9.5, 32, 18, 3); ctx.fillStyle = color; ctx.fill();
+    ctx.fillStyle = '#f1dabb'; ctx.fillRect(-14, -8, 28, 1.8);
+    ctx.fillStyle = '#e9d5ae'; ctx.fillRect(-11, -4, 13, 8);
+    ctx.beginPath(); ctx.moveTo(-10, -3); ctx.lineTo(-4.5, 0.5); ctx.lineTo(1, -3);
+    stroke(ctx, dark, 0.8);
+    ctx.fillStyle = '#f7e9c9'; ctx.font = '800 11px system-ui, sans-serif';
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+    ctx.fillText(String(target + 1), 9, 0.5);
+    ctx.restore();
+  }
+
+  function drawTrain(ctx, train, time, steam) {
+    const target = routes[train.target] ? Number(train.target) : 1;
+    const route = routes[target];
+    const angle = Number.isFinite(train.angle) ? train.angle : 0;
+    const track = train.y < MAIN_Y - 0.2 ? routes[0] : train.y > MAIN_Y + 0.2 ? routes[2] : routes[1];
+    let carX = train.x;
+    for (let i = 0; i < 5; i++) carX -= Math.cos(routeAngle(track, carX)) * 8.1;
+    const carY = routeY(track, carX);
+    ctx.beginPath();
+    ctx.moveTo(carX, carY); ctx.lineTo(train.x, train.y);
+    stroke(ctx, '#524c3e', 3.5);
+    drawMailCar(ctx, carX, carY, routeAngle(track, carX), route.color, route.dark, target);
+
+    ctx.save(); ctx.translate(train.x, train.y); ctx.rotate(angle);
+    rounded(ctx, -21, -8, 46, 25, 5); ctx.fillStyle = '#30352d59'; ctx.fill();
+    ctx.fillStyle = '#343b36';
+    ctx.fillRect(-14, -14, 7, 28); ctx.fillRect(7, -12, 7, 24);
+    rounded(ctx, -21, -12, 44, 24, 5); ctx.fillStyle = route.dark; ctx.fill();
+    rounded(ctx, -19, -10, 24, 20, 4); ctx.fillStyle = route.color; ctx.fill();
+    ctx.fillStyle = '#e7c996'; ctx.fillRect(-17, -9, 20, 1.6);
+    symbol(ctx, target, -7.5, 0, 7.3, '#fff0d3');
+    rounded(ctx, 4, -7, 17, 14, 6); ctx.fillStyle = route.color; ctx.fill();
+    ctx.fillStyle = '#ecd7a5'; ctx.fillRect(17, -6, 2, 12);
+    ellipse(ctx, 13, 0, 4.1, 4.1, '#343d35');
+    ellipse(ctx, 12.3, -0.8, 1.4, 1.4, '#828c72');
+    polygon(ctx, [[21, -10], [26, -6], [26, 6], [21, 10]], '#4f5547');
+    ctx.fillStyle = '#e8c98d'; ctx.fillRect(23, -4, 3, 8);
+    if (steam) for (let i = 0; i < 3; i++) {
+      const age = (time * 0.88 + i / 3) % 1;
+      ctx.globalAlpha = (1 - age) * 0.34;
+      ellipse(ctx, 13 - age * 35, -age * 11, 2 + age * 5, 2 + age * 3.5, '#fff4d7');
+    }
+    ctx.restore();
+  }
+
+  class PostalExpressBoard {
+    constructor(canvas) {
+      this.canvas = canvas;
+      this.context = canvas.getContext('2d', { alpha: false });
+      this.scenery = document.createElement('canvas');
+      this.scenery.width = WIDTH;
+      this.scenery.height = HEIGHT;
+      createScenery(this.scenery.getContext('2d', { alpha: false }));
+      this.needsResize = true;
+      if (typeof ResizeObserver === 'function') {
+        this.observer = new ResizeObserver(() => { this.needsResize = true; });
+        this.observer.observe(canvas);
+      }
+    }
+
+    resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const width = Math.max(1, Math.min(1400, Math.round((this.canvas.clientWidth || WIDTH) * dpr)));
+      const height = Math.max(1, Math.min(700, Math.round((this.canvas.clientHeight || HEIGHT) * dpr)));
+      if (this.canvas.width !== width) this.canvas.width = width;
+      if (this.canvas.height !== height) this.canvas.height = height;
+      this.needsResize = false;
+      this.dpr = dpr;
+    }
+
+    draw(state) {
+      if (!this.observer || this.needsResize || this.dpr !== Math.min(window.devicePixelRatio || 1, 1.5)) this.resize();
+      const ctx = this.context;
+      ctx.setTransform(this.canvas.width / WIDTH, 0, 0, this.canvas.height / HEIGHT, 0, 0);
+      ctx.drawImage(this.scenery, 0, 0);
+      activeTurnout(ctx, 0, Boolean(state.switches?.[0]));
+      activeTurnout(ctx, 1, Boolean(state.switches?.[1]));
+      for (const train of state.trains || []) drawTrain(ctx, train, state.time || 0, state.mode === 'playing');
+      if ((!state.trains || !state.trains.length) && state.mode === 'menu') {
+        drawTrain(ctx, { x: 133, y: MAIN_Y, angle: 0, target: 0 }, 0, false);
+      }
+    }
+  }
+
+  window.PostalExpressBoard = PostalExpressBoard;
+})();
+
+</script>
+<script>
+(() => {
+  'use strict';
+  const byId = id => document.getElementById(id);
+  const stations = [
+    {name:'Сосны', icon:'#pine-icon'},
+    {name:'Луг', icon:'#field-icon'},
+    {name:'Мельница', icon:'#mill-icon'}
+  ];
+  const routeButtons = Array.from(document.querySelectorAll('.route'));
+  const switchButtons = Array.from(document.querySelectorAll('.switch'));
+  const hearts = Array.from(byId('lives').querySelectorAll('svg'));
+  const board = new window.PostalExpressBoard(byId('board'));
+  const game = new window.PostalExpressGame({onUpdate: update, onEvent: gameEvent});
+  let state;
+  let lastMode = '';
+  let dirty = true;
+  let audioContext;
+  let sound = true;
+  let noticeUntil = 0;
+  try { sound = localStorage.getItem('postal-express-sound') !== 'off'; } catch {}
+
+  function text(id, value) {
+    const element = byId(id);
+    const string = String(value);
+    if (element.textContent !== string) element.textContent = string;
+  }
+
+  function update(nextState) {
+    state = nextState;
+    dirty = true;
+    const playing = state.mode === 'playing';
+    text('score', state.score);
+    text('streak', state.streak);
+    text('level', state.level);
+    text('delivered', state.delivered);
+    text('best', state.best);
+    hearts.forEach((heart, index) => heart.classList.toggle('lost', index >= state.lives));
+    byId('lives').setAttribute('aria-label', 'Осталось жизней: ' + state.lives);
+    const route = state.switches[0] ? 0 : state.switches[1] ? 2 : 1;
+    routeButtons.forEach((button, index) => {
+      button.disabled = !playing;
+      button.setAttribute('aria-pressed', String(index === route));
+    });
+    switchButtons.forEach((button, index) => {
+      button.hidden = !playing;
+      button.setAttribute('aria-pressed', String(state.switches[index]));
+      const arrow = state.switches[index] ? (index === 0 ? '↗' : '↘') : '→';
+      if (button.lastElementChild.textContent !== arrow) button.lastElementChild.textContent = arrow;
+    });
+    const nextStation = stations[state.nextTarget];
+    byId('next').hidden = !playing || !nextStation;
+    if (nextStation) {
+      byId('next-destination').dataset.station = state.nextTarget;
+      byId('next-icon').setAttribute('href', nextStation.icon);
+      text('next-name', nextStation.name);
+    }
+    if (noticeUntil && state.time >= noticeUntil) {
+      text('message', '');
+      noticeUntil = 0;
+    }
+    if (state.mode === lastMode) return;
+    const previousMode = lastMode;
+    lastMode = state.mode;
+    byId('pause').disabled = state.mode === 'menu' || state.mode === 'over';
+    byId('pause').setAttribute('aria-label', playing ? 'Пауза' : 'Продолжить');
+    byId('pause').querySelector('use').setAttribute('href', state.mode === 'paused' ? '#play-icon' : '#pause-icon');
+    byId('overlay').hidden = playing;
+    byId('menu').hidden = state.mode !== 'menu';
+    byId('paused').hidden = state.mode !== 'paused';
+    byId('over').hidden = state.mode !== 'over';
+    if (state.mode === 'over') {
+      text('summary', 'Доставлено поездов: ' + state.delivered + '. Очки: ' + state.score + '. Рекорд: ' + state.best + '.');
+      byId('again').focus({preventScroll:true});
+    } else if (state.mode === 'paused') byId('resume').focus({preventScroll:true});
+    else if (playing && previousMode) byId('board').focus({preventScroll:true});
+  }
+
+  function prepareAudio() {
+    if (!sound) return;
+    try {
+      const Audio = window.AudioContext || window.webkitAudioContext;
+      if (!audioContext && Audio) audioContext = new Audio();
+      if (audioContext && audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+    } catch {}
+  }
+
+  function tone(frequency, offset, duration) {
+    if (!sound || !audioContext || audioContext.state !== 'running') return;
+    const oscillator = audioContext.createOscillator();
+    const volume = audioContext.createGain();
+    const start = audioContext.currentTime + offset;
+    oscillator.type = 'triangle';
+    oscillator.frequency.value = frequency;
+    volume.gain.setValueAtTime(.045, start);
+    volume.gain.exponentialRampToValueAtTime(.001, start + duration);
+    oscillator.connect(volume);
+    volume.connect(audioContext.destination);
+    oscillator.start(start);
+    oscillator.stop(start + duration);
+    oscillator.onended = () => { oscillator.disconnect(); volume.disconnect(); };
+  }
+
+  function gameEvent(event) {
+    if (event.type === 'switch') { tone(220, 0, .055); return; }
+    if (event.type === 'delivery' || event.type === 'miss') {
+      const miss = event.type === 'miss';
+      const station = stations[event.target];
+      text('message', miss ? 'Маршрут перепутан' : 'Почта доставлена' + (station ? ' · ' + station.name : ''));
+      byId('message').classList.toggle('error', miss);
+      noticeUntil = (state ? state.time : 0) + 2;
+      tone(miss ? 164 : 440, 0, .13);
+      tone(miss ? 131 : 659, .08, .16);
+    }
+  }
+
+  function start() {
+    prepareAudio();
+    text('message', '');
+    noticeUntil = 0;
+    game.start();
+  }
+
+  function updateSound() {
+    byId('sound').setAttribute('aria-pressed', String(sound));
+    byId('sound').querySelector('use').setAttribute('href', sound ? '#sound-icon' : '#mute-icon');
+  }
+
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {}
+  }
+
+  ['start','again','restart'].forEach(id => byId(id).addEventListener('click', start));
+  ['pause','resume'].forEach(id => byId(id).addEventListener('click', () => game.togglePause()));
+  routeButtons.forEach((button, index) => button.addEventListener('click', () => game.setRoute(index)));
+  switchButtons.forEach((button, index) => button.addEventListener('click', () => game.toggleSwitch(index)));
+  byId('sound').addEventListener('click', () => {
+    sound = !sound;
+    try { localStorage.setItem('postal-express-sound', sound ? 'on' : 'off'); } catch {}
+    updateSound();
+    prepareAudio();
+  });
+  byId('fullscreen').hidden = !document.fullscreenEnabled;
+  byId('fullscreen').addEventListener('click', toggleFullscreen);
+  document.addEventListener('fullscreenchange', () => {
+    byId('fullscreen').setAttribute('aria-pressed', String(Boolean(document.fullscreenElement)));
+    dirty = true;
+  });
+  window.addEventListener('keydown', event => {
+    if (event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
+    if (event.code === 'Escape' || event.code === 'KeyP') game.togglePause();
+    if (event.code === 'KeyF' && document.fullscreenEnabled) toggleFullscreen();
+    if (state.mode !== 'playing') return;
+    const number = /^(?:Digit|Numpad)([123])$/.exec(event.code);
+    if (number) { event.preventDefault(); game.setRoute(Number(number[1]) - 1); }
+    if (event.code === 'KeyQ') game.toggleSwitch(0);
+    if (event.code === 'KeyE') game.toggleSwitch(1);
+  });
+  window.addEventListener('blur', () => game.pause());
+  window.addEventListener('resize', () => { dirty = true; });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) game.pause(); });
+  updateSound();
+  update(game.getState());
+  let lastFrame;
+  function frame(now) {
+    if (lastFrame === undefined) lastFrame = now;
+    const elapsed = now - lastFrame;
+    if (elapsed >= 32) {
+      lastFrame = now;
+      if (state.mode === 'playing') game.tick(Math.min(.15, elapsed / 1000));
+      if (dirty) { board.draw(state); dirty = false; }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
