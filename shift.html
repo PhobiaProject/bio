@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#e9e5dc">
+  <meta name="description" content="Сдвиг — головоломка с керамическими плитками, цепными реакциями и ограниченным числом ходов. Работает без интернета.">
+  <title>Сдвиг — ещё одна комбинация</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23e9e5dc'/%3E%3Crect x='10' y='10' width='44' height='44' rx='7' fill='%23668e91'/%3E%3Cpath d='m32 19 13 13-13 13-13-13Z' fill='none' stroke='%23e7e5ca' stroke-width='4'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #e9e5dc;
+      --card: #f4f0e5;
+      --ink: #3f4d4e;
+      --muted: #89908a;
+      --line: #c6cbc0;
+      --teal: #557b7d;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body { background: var(--paper); color: var(--ink); overscroll-behavior: none; }
+    button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    button:focus-visible { outline: 3px solid #a77d4d; outline-offset: 4px; }
+    button:disabled { cursor: default; opacity: .38; }
+    .game { position: fixed; inset: 0; height: 100dvh; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: manipulation; }
+    .hud {
+      position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center;
+      justify-content: space-between; gap: 22px; padding: max(19px,env(safe-area-inset-top)) 25px 18px;
+      background: linear-gradient(#e9e5dc, #e9e5dc00); pointer-events: none;
+    }
+    .hud-left, .hud-right { display: flex; align-items: center; gap: 15px; }
+    .brand { font: 27px Georgia, serif; letter-spacing: -.8px; color: #657777; }
+    .level { color: #7c8983; font-size: 11px; white-space: nowrap; }
+    .progress { width: min(220px,25vw); text-align: center; margin: 0 auto; }
+    .progress-text { font-size: 12px; color: #667e79; font-variant-numeric: tabular-nums; }
+    .progress-track { height: 4px; background: #d2d5c9; margin-top: 8px; border-radius: 2px; overflow: hidden; }
+    .progress-fill { width: 0; height: 100%; background: #859a8d; transition: width .14s; }
+    .moves { display: flex; flex-direction: column; text-align: center; gap: 2px; color: #7e8b80; }
+    .moves strong { font: 26px/1 Georgia, serif; color: #516b6d; min-width: 28px; }
+    .moves small { font-size: 8px; }
+    .icon-button {
+      pointer-events: auto; width: 34px; height: 34px; display: grid; place-items: center;
+      border: 1px solid #aab8ae; border-radius: 5px; background: #f8f5e95c; color: #688180;
+    }
+    .icon-button:hover:not(:disabled) { background: #f8f5e9; }
+    .icon-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+    .shuffle-button { position: relative; font-size: 23px; }
+    .shuffle-button small { position: absolute; right: -5px; top: -7px; font: 9px/15px "Trebuchet MS",sans-serif; min-width: 15px; border-radius: 50%; background: #d7b884; color: #5b624e; }
+    .overlay {
+      position: absolute; inset: 0; z-index: 3; display: flex; align-items: center;
+      justify-content: center; padding: 24px; overflow: auto; background: #e7e4dbde;
+    }
+    .paper {
+      position: relative; width: min(400px,100%); flex-shrink: 0; padding: 34px 32px;
+      background: var(--card); border: 1px solid #fcf9ef; border-radius: 4px 16px 5px 12px;
+      box-shadow: 0 15px 48px #5d6e5e20; text-align: center;
+    }
+    .paper::before { content: ""; position: absolute; inset: 7px; border: 1px solid #99a28b30; border-radius: 1px 10px 2px 7px; pointer-events: none; }
+    .tile-mark { display: block; margin: 0 auto 19px; width: 64px; height: 64px; }
+    .eyebrow { color: #96a18e; font-size: 10px; letter-spacing: 1px; }
+    h1 { font: normal 64px/1 Georgia, serif; letter-spacing: -2.5px; color: #526f70; margin: 14px 0 18px; }
+    h2 { font: normal 36px/1.08 Georgia, serif; letter-spacing: -1px; color: #526f70; margin: 0 0 20px; }
+    .intro { font-size: 12px; color: #7c8b7d; line-height: 1.8; margin: 0 0 25px; }
+    .primary {
+      width: 100%; min-height: 48px; display: flex; justify-content: space-between; align-items: center;
+      gap: 18px; padding: 13px 19px; border-radius: 4px; border: 1px solid var(--teal);
+      color: #f7f1dc; background: var(--teal); font-size: 13px;
+    }
+    .primary:hover { background: #436b6d; }
+    .primary span { font-size: 21px; }
+    .secondary { width: 100%; padding: 12px; margin-top: 10px; border: 1px solid #b6c2b4; color: #788e7f; background: transparent; border-radius: 4px; font-size: 12px; }
+    .secondary:hover { background: #e8eddf; }
+    .controls { color: #8b9788; font-size: 10px; line-height: 1.85; margin: 19px 0 0; }
+    .record { font-size: 10px; color: #9ba38f; margin: 16px 0 0; }
+    .record strong { font-weight: normal; color: #788e7e; }
+    .stats { display: flex; justify-content: space-around; gap: 14px; margin: 26px 0; }
+    .stats strong { display: block; font: 30px/1.2 Georgia,serif; color: #628581; }
+    .stats small { display: block; color: #9aa48e; font-size: 8px; letter-spacing: .6px; margin-top: 6px; }
+    .toast { position: absolute; bottom: max(22px,env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); max-width: calc(100% - 34px); padding: 11px 18px; border: 1px solid #aebdae55; border-radius: 4px; background: #f4f2e8ee; color: #6b8b7a; font-size: 11px; text-align: center; pointer-events: none; }
+    .combo { position: absolute; left: 50%; bottom: max(23px,env(safe-area-inset-bottom)); transform: translateX(-50%); color: #9b865b; font: italic 24px Georgia,serif; pointer-events: none; white-space: nowrap; }
+    [hidden] { display: none !important; }
+    @media (max-width:650px) {
+      .hud { gap: 12px; padding: max(15px,env(safe-area-inset-top)) 13px 15px; }
+      .hud-left, .hud-right { gap: 9px; }
+      .brand { display: none; }
+      .level { font-size: 9px; }
+      .progress { width: 100px; }
+      .progress-text { font-size: 10px; }
+      .moves strong { font-size: 23px; }
+      .moves small { font-size: 7px; }
+      .icon-button { width: 29px; height: 29px; }
+      .fullscreen { display: none; }
+      .paper { padding: 29px 27px; }
+      h1 { font-size: 55px; }
+      h2 { font-size: 32px; }
+      .combo { font-size: 20px; }
+    }
+    @media (max-height:540px) and (min-width:600px) {
+      .paper { padding: 23px 29px; }
+      .tile-mark { width: 44px; height: 44px; margin-bottom: 10px; }
+      h1 { font-size: 47px; margin: 10px 0 13px; }
+      .intro { margin-bottom: 18px; font-size: 11px; }
+      .controls { margin-top: 12px; font-size: 9px; }
+      .record { margin-top: 10px; }
+      h2 { font-size: 31px; }
+      .stats { margin: 18px 0; }
+    }
+    @media (prefers-reduced-motion:reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <canvas id="board" tabindex="0" aria-label="Поле 8 на 8. Стрелки — курсор. Enter или пробел — выбрать плитку. Выбери соседнюю для обмена."></canvas>
+    <div class="hud" id="hud" hidden>
+      <div class="hud-left"><span class="brand">Сдвиг</span><span class="level" id="level-label">Уровень 1</span></div>
+      <div class="progress" aria-label="Прогресс уровня"><span class="progress-text" id="progress-text">0 / 800</span><div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div></div>
+      <div class="hud-right"><div class="moves"><strong id="moves-label">18</strong><small>ХОДОВ</small></div><button class="icon-button shuffle-button" id="shuffle-button" aria-label="Перемешать плитки" title="Перемешать плитки"><span>↻</span><small id="shuffles-label">2</small></button><button class="icon-button fullscreen" id="fullscreen-button" aria-label="Полный экран" title="Полный экран · F"><svg viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button><button class="icon-button" id="pause-button" aria-label="Пауза" title="Пауза · Escape"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button></div>
+    </div>
+    <section class="overlay" id="menu-view" aria-label="Главное меню"><div class="paper">
+      <svg class="tile-mark" viewBox="0 0 64 64" aria-hidden="true"><rect x="2" y="2" width="27" height="27" rx="5" fill="#668e91"/><path d="m15.5 8 7 7.5-7 7.5-7-7.5Z" fill="none" stroke="#e3e3c7" stroke-width="2"/><rect x="35" y="2" width="27" height="27" rx="5" fill="#c4a45e"/><circle cx="48.5" cy="15.5" r="7" fill="none" stroke="#f6e7bc" stroke-width="2"/><rect x="2" y="35" width="27" height="27" rx="5" fill="#9d7e91"/><path d="M15.5 41v15m-7.5-7.5h15" stroke="#f1dec9" stroke-width="2"/><rect x="35" y="35" width="27" height="27" rx="5" fill="#87936a"/><path d="m48.5 40 8 15h-16Z" fill="none" stroke="#e4e4c6" stroke-width="2"/></svg>
+      <span class="eyebrow">Ещё одна комбинация</span><h1>Сдвиг</h1>
+      <p class="intro">Меняй соседние плитки.<br>Собирай от трёх в ряд. Лови цепные реакции.</p>
+      <button class="primary" id="start-button">Сложить узор <span>→</span></button>
+      <p class="controls">Кликни или коснись двух соседних плиток.<br>Стрелки — курсор. Enter / пробел — выбрать.<br>Неверный обмен не тратит ход. ↻ — перемешать.</p>
+      <p class="record">Рекорд <strong id="best-label">0</strong></p>
+    </div></section>
+    <section class="overlay" id="pause-view" aria-label="Пауза" hidden><div class="paper"><h2>Можно подумать.</h2><button class="primary" id="resume-button">Продолжить <span>→</span></button><button class="secondary" id="restart-button">Начать заново</button><button class="secondary" id="pause-fullscreen">Полный экран</button><p class="controls">Собирай одинаковые плитки по горизонтали и вертикали.<br>Обмен без комбинации возвращается и сохраняет ход.<br>Каскады приносят больше очков. На уровне есть цель<br>и два перемешивания. Escape / P — пауза, F — экран.</p></div></section>
+    <section class="overlay" id="level-view" aria-label="Уровень пройден" hidden><div class="paper"><span class="eyebrow" id="complete-label">Уровень 1 пройден</span><h2 style="margin-top:15px">Узор сложился.</h2><div class="stats"><div><strong id="level-score">0</strong><small>НА УРОВНЕ</small></div><div><strong id="level-moves">0</strong><small>ХОДОВ ОСТАЛОСЬ</small></div></div><button class="primary" id="next-button">Следующий узор <span>→</span></button></div></section>
+    <section class="overlay" id="over-view" aria-label="Ходы закончились" hidden><div class="paper"><h2>Ходы закончились.</h2><p class="intro">Новый узор — новые возможности.</p><div class="stats"><div><strong id="end-score">0</strong><small>ВСЕГО ОЧКОВ</small></div><div><strong id="end-best">0</strong><small>РЕКОРД</small></div></div><button class="primary" id="again-button">Ещё один узор <span>→</span></button></div></section>
+    <div class="combo" id="combo-label" hidden></div>
+    <div class="toast" id="toast" role="status" hidden></div>
+  </main>
+  <noscript>Для игры нужен JavaScript. Включи его в настройках браузера.</noscript>
+  <script id="shift-core">
+  (() => {
+    'use strict';
+    const SIZE = 8;
+    const TYPES = 6;
+    const MAX_CASCADES = 12;
+    const copyBoard = board => board.map(row => row.slice());
+
+    function matches(board) {
+      const found = new Set();
+      for (let y = 0; y < SIZE; y++) {
+        for (let start = 0; start < SIZE;) {
+          let end = start + 1;
+          while (end < SIZE && board[y][end] === board[y][start]) end++;
+          if (end - start >= 3) for (let x = start; x < end; x++) found.add(y * SIZE + x);
+          start = end;
+        }
+      }
+      for (let x = 0; x < SIZE; x++) {
+        for (let start = 0; start < SIZE;) {
+          let end = start + 1;
+          while (end < SIZE && board[end][x] === board[start][x]) end++;
+          if (end - start >= 3) for (let y = start; y < end; y++) found.add(y * SIZE + x);
+          start = end;
+        }
+      }
+      return [...found];
+    }
+
+    function exchange(board, first, second) {
+      const ax = first % SIZE, ay = Math.floor(first / SIZE);
+      const bx = second % SIZE, by = Math.floor(second / SIZE);
+      [board[ay][ax], board[by][bx]] = [board[by][bx], board[ay][ax]];
+    }
+
+    function legalSwap(board) {
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          const first = y * SIZE + x;
+          for (const second of [x < SIZE - 1 ? first + 1 : -1, y < SIZE - 1 ? first + SIZE : -1]) {
+            if (second < 0) continue;
+            exchange(board, first, second);
+            const valid = matches(board).length > 0;
+            exchange(board, first, second);
+            if (valid) return [first, second];
+          }
+        }
+      }
+      return null;
+    }
+
+    function fallbackBoard() {
+      const board = Array.from({ length: SIZE }, (_, y) => Array.from({ length: SIZE }, (_, x) => (x + y * 2) % TYPES));
+      board[0][2] = 0;
+      board[1][1] = 0;
+      return board;
+    }
+
+    function createBoard(random) {
+      for (let attempt = 0; attempt < 60; attempt++) {
+        const board = Array.from({ length: SIZE }, () => Array(SIZE));
+        for (let y = 0; y < SIZE; y++) {
+          for (let x = 0; x < SIZE; x++) {
+            const excluded = new Set();
+            if (x > 1 && board[y][x - 1] === board[y][x - 2]) excluded.add(board[y][x - 1]);
+            if (y > 1 && board[y - 1][x] === board[y - 2][x]) excluded.add(board[y - 1][x]);
+            const available = Array.from({ length: TYPES }, (_, type) => type).filter(type => !excluded.has(type));
+            board[y][x] = available[Math.floor(random() * available.length)];
+          }
+        }
+        if (legalSwap(board)) return board;
+      }
+      return fallbackBoard();
+    }
+
+    function reshuffle(board, random) {
+      const tiles = board.flat();
+      for (let attempt = 0; attempt < 160; attempt++) {
+        for (let i = tiles.length - 1; i > 0; i--) {
+          const next = Math.floor(random() * (i + 1));
+          [tiles[i], tiles[next]] = [tiles[next], tiles[i]];
+        }
+        const next = Array.from({ length: SIZE }, (_, y) => tiles.slice(y * SIZE, (y + 1) * SIZE));
+        if (!matches(next).length && legalSwap(next)) return next;
+      }
+      return createBoard(random);
+    }
+
+    class ShiftGame {
+      constructor({ random = Math.random, onChange, onEvent } = {}) {
+        this.random = random;
+        this.onChange = onChange;
+        this.onEvent = onEvent;
+        this.best = 0;
+        try {
+          const stored = Number(localStorage.getItem('shift-best'));
+          if (Number.isFinite(stored) && stored > 0) this.best = Math.floor(stored);
+        } catch {}
+        this.reset('menu');
+      }
+
+      reset(mode = 'playing') {
+        this.mode = mode;
+        this.pausedMode = null;
+        this.pendingMode = null;
+        this.level = 1;
+        this.score = 0;
+        this.setupLevel();
+      }
+
+      setupLevel() {
+        this.board = createBoard(this.random);
+        this.levelScore = 0;
+        this.target = 800 + (this.level - 1) * 350;
+        this.moves = 18 + Math.min(6, Math.floor((this.level - 1) / 2));
+        this.shuffles = 2;
+      }
+
+      start() { this.reset(); this.notify(); }
+      getState() {
+        return { mode: this.mode, level: this.level, score: this.score, levelScore: this.levelScore, target: this.target, moves: this.moves, shuffles: this.shuffles, best: this.best };
+      }
+      notify() { this.onChange?.(this.getState()); }
+      emit(type, details = {}) { this.onEvent?.({ type, ...details }); }
+      pause() {
+        if (this.mode !== 'playing' && this.mode !== 'resolving') return;
+        this.pausedMode = this.mode;
+        this.mode = 'paused';
+        this.notify();
+      }
+      resume() {
+        if (this.mode !== 'paused') return;
+        this.mode = this.pausedMode || 'playing';
+        this.pausedMode = null;
+        this.notify();
+      }
+      togglePause() {
+        if (this.mode === 'paused') this.resume();
+        else this.pause();
+      }
+
+      swap(first, second) {
+        if (this.mode !== 'playing' || !Number.isInteger(first) || !Number.isInteger(second) || first < 0 || second < 0 || first >= 64 || second >= 64) return null;
+        const apart = Math.abs(first % SIZE - second % SIZE) + Math.abs(Math.floor(first / SIZE) - Math.floor(second / SIZE));
+        if (apart !== 1) return null;
+        const before = copyBoard(this.board);
+        exchange(this.board, first, second);
+        const frames = [{ board: copyBoard(this.board), marks: [], duration: 110 }];
+        let found = matches(this.board);
+        this.mode = 'resolving';
+        if (!found.length) {
+          this.board = before;
+          frames.push({ board: copyBoard(before), marks: [], duration: 110 });
+          this.pendingMode = 'playing';
+          this.notify();
+          return { valid: false, frames };
+        }
+
+        this.moves--;
+        let chain = 0;
+        while (found.length && chain < MAX_CASCADES) {
+          chain++;
+          const points = found.length * 20 * chain;
+          this.score += points;
+          this.levelScore += points;
+          frames.push({ board: copyBoard(this.board), marks: found.slice(), chain, points, duration: 120 });
+          const removed = new Set(found);
+          for (let x = 0; x < SIZE; x++) {
+            const remaining = [];
+            for (let y = SIZE - 1; y >= 0; y--) if (!removed.has(y * SIZE + x)) remaining.push(this.board[y][x]);
+            for (let y = SIZE - 1; y >= 0; y--) {
+              const offset = SIZE - 1 - y;
+              this.board[y][x] = offset < remaining.length ? remaining[offset] : Math.floor(this.random() * TYPES);
+            }
+          }
+          frames.push({ board: copyBoard(this.board), marks: [], chain, duration: 90 });
+          found = matches(this.board);
+        }
+        // Unusual random sequences cannot cause an unbounded cascade.
+        if (found.length) this.board = createBoard(this.random);
+        const automaticShuffle = !legalSwap(this.board);
+        if (automaticShuffle) this.board = reshuffle(this.board, this.random);
+        frames.push({ board: copyBoard(this.board), marks: [], duration: 80 });
+        this.pendingMode = this.levelScore >= this.target ? 'level' : this.moves === 0 ? 'over' : 'playing';
+        this.saveBest();
+        this.notify();
+        if (automaticShuffle) this.emit('shuffle', { automatic: true });
+        return { valid: true, frames, chain };
+      }
+
+      shuffle() {
+        if (this.mode !== 'playing' || this.shuffles <= 0) return null;
+        this.shuffles--;
+        this.board = reshuffle(this.board, this.random);
+        this.mode = 'resolving';
+        this.pendingMode = 'playing';
+        this.notify();
+        this.emit('shuffle', { automatic: false });
+        return { valid: true, frames: [{ board: copyBoard(this.board), marks: Array.from({ length: 64 }, (_, i) => i), duration: 100 }, { board: copyBoard(this.board), marks: [], duration: 100 }] };
+      }
+
+      finishResolution() {
+        if (this.mode !== 'resolving') return false;
+        this.mode = this.pendingMode || 'playing';
+        this.pendingMode = null;
+        this.notify();
+        return true;
+      }
+
+      nextLevel() {
+        if (this.mode !== 'level') return false;
+        this.level++;
+        this.setupLevel();
+        this.mode = 'playing';
+        this.notify();
+        return true;
+      }
+
+      saveBest() {
+        if (this.score <= this.best) return;
+        this.best = this.score;
+        try { localStorage.setItem('shift-best', String(this.best)); } catch {}
+      }
+    }
+    ShiftGame.matches = matches;
+    ShiftGame.legalSwap = legalSwap;
+    ShiftGame.createBoard = createBoard;
+    ShiftGame.reshuffle = reshuffle;
+    window.ShiftGame = ShiftGame;
+  })();
+  </script>
+  <script>
+  (() => {
+    'use strict';
+    const $ = id => document.getElementById(id);
+    const canvas = $('board');
+    const c = canvas.getContext('2d');
+    const COLORS = ['#bd765d', '#668e91', '#c4a45e', '#7b86a1', '#87936a', '#9d7e91'];
+    const INKS = ['#f3ddbb', '#e5e8cb', '#f8ecc5', '#e3e3ce', '#e3e5c5', '#f0ddcc'];
+    const overlays = { menu: $('menu-view'), paused: $('pause-view'), level: $('level-view'), over: $('over-view') };
+    let width = 1000, height = 700, scale = 1, tile = 60, left = 260, top = 110;
+    let renderPending = false;
+    let currentMode = 'menu';
+    let selected = null;
+    let cursor = 27;
+    let keyboardCursor = false;
+    let starting = false;
+    let toastTimer;
+    const game = new window.ShiftGame({ onChange: update, onEvent: handleEvent });
+    window.shiftGame = game;
+
+    // Only a bounded sequence of snapshots needs timers. Idle boards draw nothing.
+    const animation = {
+      frames: [], index: 0, board: null, marks: [], timer: null, deadline: 0, remaining: 0, running: false,
+      clear() {
+        clearTimeout(this.timer);
+        this.timer = null; this.frames = []; this.board = null; this.marks = []; this.running = false;
+        $('combo-label').hidden = true;
+      },
+      play(frames) {
+        this.clear(); this.frames = frames; this.index = 0; this.running = true;
+        this.showFrame();
+      },
+      showFrame() {
+        if (this.index >= this.frames.length) {
+          this.clear(); game.finishResolution(); requestRender(); return;
+        }
+        const frame = this.frames[this.index];
+        this.board = frame.board; this.marks = frame.marks;
+        $('combo-label').textContent = frame.chain > 1 ? `Цепочка ×${frame.chain} · +${frame.points || 0}` : frame.points ? `+${frame.points}` : '';
+        $('combo-label').hidden = !frame.points;
+        requestRender();
+        this.schedule(frame.duration);
+      },
+      schedule(delay) {
+        this.remaining = delay;
+        if (game.mode === 'paused') return;
+        this.deadline = performance.now() + delay;
+        this.timer = setTimeout(() => { this.timer = null; this.index++; this.showFrame(); }, delay);
+      },
+      pause() {
+        if (!this.running || this.timer === null) return;
+        this.remaining = Math.max(1, this.deadline - performance.now());
+        clearTimeout(this.timer); this.timer = null;
+      },
+      resume() {
+        if (this.running && this.timer === null) {
+          const frame = this.frames[this.index];
+          $('combo-label').hidden = !frame?.points;
+          this.schedule(this.remaining);
+        }
+      }
+    };
+
+    function requestRender() {
+      if (renderPending) return;
+      renderPending = true;
+      requestAnimationFrame(() => { renderPending = false; draw(); });
+    }
+
+    function resize() {
+      const bounds = canvas.getBoundingClientRect();
+      width = bounds.width; height = bounds.height;
+      scale = Math.min(1, 1200 / Math.max(1, width), 800 / Math.max(1, height));
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      const header = width < 650 ? 74 : 88;
+      tile = Math.max(16, Math.min(112, (width - 36) / 8, (height - header - 61) / 8));
+      left = (width - tile * 8) / 2;
+      top = header + Math.max(0, (height - header - 61 - tile * 8) / 2);
+      requestRender();
+    }
+
+    function update(state) {
+      for (const [mode, overlay] of Object.entries(overlays)) overlay.hidden = mode !== state.mode;
+      $('hud').hidden = !['playing', 'resolving'].includes(state.mode);
+      $('level-label').textContent = `Уровень ${state.level}`;
+      $('progress-text').textContent = `${state.levelScore.toLocaleString('ru-RU')} / ${state.target.toLocaleString('ru-RU')}`;
+      $('progress-fill').style.width = `${Math.min(100, state.levelScore / state.target * 100)}%`;
+      $('moves-label').textContent = state.moves;
+      $('shuffles-label').textContent = state.shuffles;
+      $('shuffle-button').disabled = state.mode !== 'playing' || state.shuffles === 0;
+      $('shuffle-button').setAttribute('aria-label', `Перемешать плитки. Осталось ${state.shuffles}`);
+      $('best-label').textContent = state.best.toLocaleString('ru-RU');
+      if (state.mode === 'paused') animation.pause();
+      if (state.mode === 'resolving' && currentMode === 'paused') animation.resume();
+      if (state.mode === 'level') {
+        $('complete-label').textContent = `Уровень ${state.level} пройден`;
+        $('level-score').textContent = state.levelScore.toLocaleString('ru-RU');
+        $('level-moves').textContent = state.moves;
+      }
+      if (state.mode === 'over') {
+        $('end-score').textContent = state.score.toLocaleString('ru-RU');
+        $('end-best').textContent = state.best.toLocaleString('ru-RU');
+      }
+      if (state.mode !== currentMode) {
+        if (state.mode === 'playing') canvas.focus({ preventScroll: true });
+        if (state.mode === 'paused') $('resume-button').focus({ preventScroll: true });
+        if (state.mode === 'level') $('next-button').focus({ preventScroll: true });
+        if (state.mode === 'over') $('again-button').focus({ preventScroll: true });
+        if (overlays[state.mode]) { $('toast').hidden = true; $('combo-label').hidden = true; }
+        currentMode = state.mode;
+      }
+      requestRender();
+    }
+
+    function handleEvent(event) {
+      if (event.type !== 'shuffle') return;
+      clearTimeout(toastTimer);
+      $('toast').textContent = event.automatic ? 'Появились новые ходы. Перемешивание бесплатно.' : 'Новый порядок — новые комбинации.';
+      $('toast').hidden = false;
+      toastTimer = setTimeout(() => { $('toast').hidden = true; }, 1700);
+    }
+
+    function select(index) {
+      if (game.mode !== 'playing' || animation.running) return;
+      cursor = index;
+      if (selected === index) selected = null;
+      else if (selected === null) selected = index;
+      else {
+        const result = game.swap(selected, index);
+        if (result) { selected = null; animation.play(result.frames); }
+        else selected = index;
+      }
+      requestRender();
+    }
+
+    function roundedRect(x, y, w, h, r) {
+      c.beginPath(); c.moveTo(x + r, y); c.lineTo(x + w - r, y);
+      c.quadraticCurveTo(x + w, y, x + w, y + r); c.lineTo(x + w, y + h - r);
+      c.quadraticCurveTo(x + w, y + h, x + w - r, y + h); c.lineTo(x + r, y + h);
+      c.quadraticCurveTo(x, y + h, x, y + h - r); c.lineTo(x, y + r);
+      c.quadraticCurveTo(x, y, x + r, y); c.closePath();
+    }
+
+    function symbol(type, x, y, radius) {
+      c.strokeStyle = INKS[type]; c.fillStyle = INKS[type];
+      c.lineWidth = Math.max(1.5, radius * 0.14); c.lineJoin = 'round'; c.lineCap = 'round';
+      c.beginPath();
+      if (type === 0) {
+        c.arc(x, y, radius * 0.78, 0, Math.PI * 2); c.stroke();
+        c.beginPath(); c.arc(x, y, radius * 0.17, 0, Math.PI * 2); c.fill();
+      } else if (type === 1) {
+        c.moveTo(x, y - radius); c.lineTo(x + radius, y); c.lineTo(x, y + radius); c.lineTo(x - radius, y); c.closePath(); c.stroke();
+        c.beginPath(); c.moveTo(x - radius * 0.3, y); c.lineTo(x + radius * 0.3, y); c.stroke();
+      } else if (type === 2) {
+        c.moveTo(x, y - radius); c.lineTo(x + radius, y + radius * 0.72); c.lineTo(x - radius, y + radius * 0.72); c.closePath(); c.stroke();
+      } else if (type === 3) {
+        c.moveTo(x - radius, y); c.lineTo(x + radius, y); c.moveTo(x, y - radius); c.lineTo(x, y + radius); c.stroke();
+        c.beginPath(); c.arc(x, y, radius * 0.44, 0, Math.PI * 2); c.stroke();
+      } else if (type === 4) {
+        c.moveTo(x - radius * 0.7, y + radius); c.quadraticCurveTo(x - radius, y - radius, x + radius * 0.8, y - radius);
+        c.quadraticCurveTo(x + radius, y + radius * 0.7, x - radius * 0.7, y + radius); c.stroke();
+        c.beginPath(); c.moveTo(x - radius * 0.7, y + radius); c.lineTo(x + radius * 0.45, y - radius * 0.6); c.stroke();
+      } else {
+        c.rect(x - radius * 0.78, y - radius * 0.78, radius * 1.56, radius * 1.56); c.stroke();
+        c.beginPath(); c.moveTo(x - radius * 0.35, y - radius * 0.35); c.lineTo(x + radius * 0.35, y + radius * 0.35);
+        c.moveTo(x + radius * 0.35, y - radius * 0.35); c.lineTo(x - radius * 0.35, y + radius * 0.35); c.stroke();
+      }
+    }
+
+    function drawTile(type, x, y, marked) {
+      const gap = Math.max(3, tile * 0.065);
+      const size = tile - gap * 2;
+      c.fillStyle = '#687d6c35'; roundedRect(x + gap, y + gap + 3, size, size, 6); c.fill();
+      c.fillStyle = COLORS[type]; roundedRect(x + gap, y + gap, size, size, 6); c.fill();
+      c.strokeStyle = '#344e4e35'; c.lineWidth = 1; c.stroke();
+      c.strokeStyle = '#fff7dd5c'; c.lineWidth = 1.5;
+      c.beginPath(); c.moveTo(x + gap + 7, y + gap + 2); c.lineTo(x + tile - gap - 7, y + gap + 2); c.stroke();
+      symbol(type, x + tile / 2, y + tile / 2, size * 0.23);
+      if (marked) {
+        c.fillStyle = '#f7f2dfb0'; roundedRect(x + gap, y + gap, size, size, 6); c.fill();
+        c.strokeStyle = '#fffbed'; c.lineWidth = 2; roundedRect(x + gap + 2, y + gap + 2, size - 4, size - 4, 4); c.stroke();
+      }
+    }
+
+    function draw() {
+      c.setTransform(scale, 0, 0, scale, 0, 0);
+      c.fillStyle = '#e9e5dc'; c.fillRect(0, 0, width, height);
+      c.strokeStyle = '#b6c0b51d'; c.lineWidth = 1;
+      for (let y = 20; y < height; y += 44) {
+        for (let x = 20; x < width; x += 44) {
+          c.beginPath(); c.moveTo(x - 2, y); c.lineTo(x + 2, y); c.moveTo(x, y - 2); c.lineTo(x, y + 2); c.stroke();
+        }
+      }
+      c.fillStyle = '#c9cdbf'; roundedRect(left - 9, top - 6, tile * 8 + 18, tile * 8 + 18, 13); c.fill();
+      c.fillStyle = '#daddd1'; roundedRect(left - 8, top - 10, tile * 8 + 16, tile * 8 + 16, 13); c.fill();
+      c.strokeStyle = '#edf0e4'; c.lineWidth = 2; c.stroke();
+      const board = animation.board || game.board;
+      const marks = new Set(animation.marks);
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) drawTile(board[y][x], left + x * tile, top + y * tile, marks.has(y * 8 + x));
+      if (selected !== null && game.mode === 'playing') {
+        c.strokeStyle = '#fffbee'; c.lineWidth = 3;
+        roundedRect(left + selected % 8 * tile + 3, top + Math.floor(selected / 8) * tile + 3, tile - 6, tile - 6, 7); c.stroke();
+      }
+      if (keyboardCursor && game.mode === 'playing') {
+        const x = left + cursor % 8 * tile, y = top + Math.floor(cursor / 8) * tile;
+        c.strokeStyle = '#756740'; c.lineWidth = 2;
+        c.beginPath(); c.moveTo(x + 12, y + 2); c.lineTo(x + 2, y + 2); c.lineTo(x + 2, y + 12);
+        c.moveTo(x + tile - 12, y + tile - 2); c.lineTo(x + tile - 2, y + tile - 2); c.lineTo(x + tile - 2, y + tile - 12); c.stroke();
+      }
+    }
+
+    async function enterFullscreen() {
+      if (document.fullscreenElement || !document.fullscreenEnabled) return;
+      try { await document.documentElement.requestFullscreen({ navigationUI: 'hide' }); } catch {}
+    }
+    async function fullscreen() {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await enterFullscreen();
+      } catch {}
+    }
+    async function start() {
+      if (starting) return;
+      starting = true;
+      animation.clear(); selected = null; cursor = 27; keyboardCursor = false;
+      clearTimeout(toastTimer); $('toast').hidden = true;
+      try { await enterFullscreen(); game.start(); } finally { starting = false; }
+    }
+    function syncFullscreen() {
+      const active = Boolean(document.fullscreenElement);
+      $('fullscreen-button').setAttribute('aria-label', active ? 'Выйти из полного экрана' : 'Полный экран');
+      $('pause-fullscreen').textContent = active ? 'Выйти из полного экрана' : 'Полный экран';
+      resize();
+    }
+    $('start-button').addEventListener('click', start);
+    $('again-button').addEventListener('click', start);
+    $('restart-button').addEventListener('click', start);
+    $('resume-button').addEventListener('click', () => game.resume());
+    $('pause-button').addEventListener('click', () => game.pause());
+    $('fullscreen-button').addEventListener('click', fullscreen);
+    $('pause-fullscreen').addEventListener('click', fullscreen);
+    $('shuffle-button').addEventListener('click', () => { const result = game.shuffle(); if (result) { selected = null; animation.play(result.frames); } });
+    $('next-button').addEventListener('click', () => { selected = null; cursor = 27; keyboardCursor = false; game.nextLevel(); });
+    canvas.addEventListener('click', event => {
+      if (game.mode !== 'playing') return;
+      const bounds = canvas.getBoundingClientRect();
+      const x = Math.floor((event.clientX - bounds.left - left) / tile);
+      const y = Math.floor((event.clientY - bounds.top - top) / tile);
+      if (x < 0 || y < 0 || x > 7 || y > 7) return;
+      keyboardCursor = false; select(y * 8 + x); canvas.focus({ preventScroll: true });
+    });
+    const directions = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    window.addEventListener('keydown', event => {
+      if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.code === 'KeyF') { event.preventDefault(); fullscreen(); return; }
+      if (event.code === 'Escape' || event.code === 'KeyP') { event.preventDefault(); game.togglePause(); return; }
+      if (game.mode !== 'playing' || animation.running) return;
+      if (/^(BUTTON|A|INPUT|SELECT|TEXTAREA)$/.test(event.target?.tagName || '')) return;
+      if (directions[event.code]) {
+        event.preventDefault(); keyboardCursor = true;
+        const [dx, dy] = directions[event.code];
+        const x = Math.max(0, Math.min(7, cursor % 8 + dx));
+        const y = Math.max(0, Math.min(7, Math.floor(cursor / 8) + dy));
+        cursor = y * 8 + x; requestRender();
+      } else if (event.code === 'Enter' || event.code === 'Space') {
+        event.preventDefault(); keyboardCursor = true; select(cursor);
+      }
+    });
+    window.addEventListener('blur', () => game.pause());
+    document.addEventListener('visibilitychange', () => { if (document.hidden) game.pause(); });
+    window.addEventListener('resize', resize);
+    document.addEventListener('fullscreenchange', syncFullscreen);
+    new ResizeObserver(resize).observe(canvas);
+    $('fullscreen-button').hidden = !document.fullscreenEnabled;
+    $('pause-fullscreen').hidden = !document.fullscreenEnabled;
+    resize(); update(game.getState());
+  })();
+  </script>
+</body>
+</html>

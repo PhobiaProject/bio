@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#25292c">
+  <meta name="description" content="Пошаговое подземелье. Найди ключ, собери сокровища и спускайся глубже. Игра работает без интернета.">
+  <title>Ключник — под светом фонаря</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2325292c'/%3E%3Ccircle cx='24' cy='24' r='12' stroke='%23d0a35c' stroke-width='7' fill='none'/%3E%3Cpath d='m32 33 20 20m-7-7 7-7' stroke='%23d0a35c' stroke-width='7'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      color-scheme: dark;
+      --background: #25292c;
+      --paper: #e8deca;
+      --ink: #3c3d37;
+      --gold: #cca368;
+      --line: #ffffff19;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body { background: var(--background); color: var(--paper); overscroll-behavior: none; }
+    button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    button:focus-visible { outline: 3px solid #dbb371; outline-offset: 4px; }
+    button:disabled { cursor: default; }
+    .game { position: fixed; inset: 0; height: 100dvh; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
+    .hud {
+      position: absolute; inset: 0 0 auto; display: flex; justify-content: space-between;
+      align-items: center; gap: 16px; padding: max(17px, env(safe-area-inset-top)) 24px 14px;
+      background: linear-gradient(#202529ed, #20252900); pointer-events: none;
+    }
+    .hud-left, .hud-right, .health, .key-status { display: flex; align-items: center; gap: 12px; }
+    .wordmark { font: 22px Georgia, serif; color: #d7bd8e; margin-right: 9px; }
+    .floor { color: #b2b5ae; font-size: 11px; white-space: nowrap; }
+    .health { gap: 7px; color: #d4a390; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .health-track { width: 86px; height: 6px; background: #141b1e; border: 1px solid #a8937338; }
+    .health-fill { height: 100%; background: #b77d64; transition: width .12s; }
+    .key-status { gap: 5px; color: #8a908e; font-size: 11px; white-space: nowrap; }
+    .key-status.found { color: #dfbc76; }
+    .key-status svg { width: 21px; height: 21px; }
+    .shield { color: #9db8b7; font-size: 11px; white-space: nowrap; }
+    .score { font: 22px Georgia, serif; color: #d0b482; font-variant-numeric: tabular-nums; }
+    .icon-button {
+      width: 33px; height: 33px; display: grid; place-items: center; border: 1px solid #c4c9bd38;
+      border-radius: 5px; background: #ffffff05; color: #cdd0c3; pointer-events: auto;
+    }
+    .icon-button:hover { background: #ffffff12; }
+    .icon-button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+    .overlay {
+      position: absolute; inset: 0; z-index: 4; display: flex; align-items: center;
+      justify-content: center; padding: 24px; overflow: auto; background: #171d22ad;
+    }
+    .paper {
+      position: relative; width: min(410px, 100%); flex-shrink: 0; padding: 35px 33px;
+      color: var(--ink); background: var(--paper); border: 1px solid #f7eedb;
+      border-radius: 3px 13px 4px 9px; text-align: center; box-shadow: 0 16px 60px #0005;
+    }
+    .paper::before { content: ""; position: absolute; inset: 7px; border: 1px solid #81796333; pointer-events: none; border-radius: 1px 8px 2px 6px; }
+    .eyebrow { color: #8e846e; font-size: 10px; letter-spacing: 1.1px; }
+    h1 { font: normal 57px/1 Georgia, serif; letter-spacing: -2px; margin: 15px 0 12px; }
+    h2 { font: normal 36px/1.12 Georgia, serif; letter-spacing: -1px; margin: 0 0 18px; }
+    .intro { color: #787968; font-size: 12px; line-height: 1.75; margin: 0 0 24px; }
+    .lantern-mark { width: 40px; height: 46px; color: #a17a42; display: block; margin: 0 auto 14px; }
+    .primary {
+      width: 100%; min-height: 48px; border: 1px solid #4d5c5d; border-radius: 4px;
+      display: flex; justify-content: space-between; align-items: center; gap: 20px;
+      padding: 13px 18px; color: #f0e8d5; background: #4d5c5d; font-size: 13px;
+    }
+    .primary:hover { background: #3d4b4d; }
+    .primary span { font-size: 21px; }
+    .secondary { width: 100%; border: 1px solid #a9aa985c; border-radius: 4px; background: transparent; color: #68716b; padding: 12px; margin-top: 10px; font-size: 12px; }
+    .controls { font-size: 10px; line-height: 1.9; color: #898676; margin: 19px 0 0; }
+    .touch-copy { display: none; }
+    .record { color: #95907e; font-size: 10px; margin: 15px 0 0; }
+    .record strong { font-weight: normal; color: #717967; }
+    .rule { border-top: 1px solid #a9a5903b; margin-top: 17px; padding-top: 15px; }
+    .danger-sample { display: inline-block; width: 9px; height: 9px; margin-right: 4px; border: 1px solid #a56853; background: #bd867450; }
+    .boon-panel { width: min(860px, 100%); text-align: center; }
+    .boon-panel > p { color: #a9afa9; font-size: 12px; margin: -6px 0 23px; }
+    .boons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .boon {
+      color: var(--ink); background: var(--paper); border: 2px solid transparent;
+      border-radius: 4px 11px 5px 8px; padding: 25px 22px; text-align: left;
+    }
+    .boon:hover { border-color: #c8a16c; transform: translateY(-3px); }
+    .boon-symbol { display: block; color: #9a7c4b; font: 29px Georgia, serif; margin-bottom: 21px; }
+    .boon h3 { margin: 0 0 12px; font: 24px/1.1 Georgia, serif; font-weight: normal; }
+    .boon p { margin: 0; color: #808271; font-size: 11px; line-height: 1.7; }
+    .stats { display: flex; justify-content: space-around; margin: 24px 0; gap: 12px; }
+    .stats strong { display: block; font: 30px Georgia, serif; color: #65706a; }
+    .stats span { display: block; font-size: 9px; color: #918b78; margin-top: 7px; }
+    .dpad { position: absolute; left: max(19px, env(safe-area-inset-left)); bottom: max(17px, env(safe-area-inset-bottom)); display: none; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 38px); gap: 4px; z-index: 2; }
+    .dpad button { border: 1px solid #9ba59d54; background: #273239e6; color: #d5d4bc; border-radius: 5px; font-size: 19px; touch-action: manipulation; }
+    .dpad button:hover { background: #465258; }
+    .dpad .up { grid-column: 2; }
+    .dpad .left { grid-column: 1; grid-row: 2; }
+    .dpad .wait { grid-column: 2; grid-row: 2; font-size: 13px; }
+    .dpad .right { grid-column: 3; grid-row: 2; }
+    .dpad .down { grid-column: 2; grid-row: 3; }
+    .toast { position: absolute; bottom: max(23px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); color: #d1c8ab; background: #20292feb; border: 1px solid #d5c49822; padding: 10px 17px; border-radius: 4px; max-width: calc(100% - 36px); text-align: center; font-size: 11px; pointer-events: none; }
+    [hidden] { display: none !important; }
+    @media (pointer: coarse), (max-width: 600px) { .dpad { display: grid; } .keyboard-copy { display: none; } .touch-copy { display: inline; } }
+    @media (max-width: 650px) {
+      .hud { padding: max(12px, env(safe-area-inset-top)) 12px 14px; gap: 8px; }
+      .hud-left, .hud-right { gap: 8px; }
+      .wordmark { display: none; }
+      .floor, .health, .key-status { font-size: 9px; }
+      .health-track { width: 48px; }
+      .health { gap: 4px; }
+      .key-status svg { width: 16px; }
+      .score { font-size: 18px; }
+      .icon-button { width: 28px; height: 28px; }
+      .fullscreen { display: none; }
+      .shield { font-size: 9px; }
+      .paper { padding: 29px 27px; }
+      h1 { font-size: 49px; }
+      h2 { font-size: 31px; }
+      .boons { display: flex; flex-direction: column; gap: 10px; }
+      .boon { display: grid; grid-template-columns: 32px 1fr; column-gap: 15px; padding: 16px 18px; }
+      .boon-symbol { margin: 0; grid-row: 1 / 3; align-self: center; }
+      .boon h3 { font-size: 22px; margin-bottom: 4px; }
+      .boon p { font-size: 10px; }
+      .toast { bottom: 20px; left: auto; right: 15px; transform: none; max-width: calc(100% - 178px); padding: 10px; }
+    }
+    @media (max-height: 540px) and (min-width: 600px) {
+      .paper { padding: 22px 30px; }
+      .lantern-mark { width: 30px; height: 32px; margin-bottom: 9px; }
+      h1 { font-size: 44px; margin: 10px 0; }
+      .intro { font-size: 11px; margin-bottom: 16px; }
+      .controls { margin-top: 11px; font-size: 9px; }
+      .rule { margin-top: 10px; padding-top: 8px; }
+      .record { margin-top: 9px; }
+      .boon { padding: 20px; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="game" id="game">
+    <canvas id="board" tabindex="0" aria-label="Подземелье. Стрелки или WASD — шаг, пробел — ждать, Escape — пауза."></canvas>
+    <div class="hud" id="hud" hidden>
+      <div class="hud-left">
+        <span class="wordmark">Ключник</span><span class="floor" id="floor-label">Этаж 1</span>
+        <div class="health" aria-label="Здоровье"><span>♥</span><div class="health-track"><div class="health-fill" id="health-fill"></div></div><span id="hp-label">12/12</span></div>
+        <span class="key-status" id="key-status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="5"/><path d="m12 12 9 9m-4-4 4-4"/></svg><span id="key-label">—</span></span>
+        <span class="shield" id="shield-label" hidden></span>
+      </div>
+      <div class="hud-right"><span class="score" id="score-label">0</span><button class="icon-button fullscreen" id="fullscreen-button" aria-label="Полный экран" title="Полный экран · F"><svg viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button><button class="icon-button" id="pause-button" aria-label="Пауза" title="Пауза · Escape"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button></div>
+    </div>
+    <section class="overlay" id="menu-view" aria-label="Главное меню">
+      <div class="paper">
+        <svg class="lantern-mark" viewBox="0 0 48 56" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 13V9a8 8 0 0 1 16 0v4M12 16h24l-3 30H15ZM11 49h26M15 53h18M19 17v27m10-27v27M10 13h28"/><path d="M24 27c8 8 5 13 0 13s-7-5 0-13Z" fill="currentColor" stroke="none"/></svg>
+        <span class="eyebrow">Под светом фонаря</span><h1>Ключник</h1>
+        <p class="intro">Ключ открывает путь глубже.<br>Сокровища делают прогулку интереснее.</p>
+        <button class="primary" id="start-button">Спуститься <span>↓</span></button>
+        <p class="controls"><span class="keyboard-copy">WASD / стрелки — шаг · Пробел — ждать<br></span><span class="touch-copy">Стрелки на экране — шаг · «·» — ждать<br></span>Ударь врага, шагнув в его сторону.</p>
+        <p class="controls rule"><span class="danger-sample"></span>Красная клетка — удар на следующем ходу.<br>Найди золотой ключ и дверь со стрелкой.</p>
+        <p class="record">Рекорд <strong id="best-label">0</strong></p>
+      </div>
+    </section>
+    <section class="overlay" id="pause-view" aria-label="Пауза" hidden><div class="paper"><h2>Фонарь подождёт.</h2><button class="primary" id="resume-button">Продолжить <span>→</span></button><button class="secondary" id="restart-button">Начать заново</button><button class="secondary" id="pause-fullscreen">Полный экран</button><p class="controls">WASD / стрелки — шаг. Пробел — ждать.<br>Шаг во врага — удар. Красную клетку лучше покинуть.<br>Escape / P — пауза. F — полный экран.<br>Найди ключ и выйди через дверь.</p></div></section>
+    <section class="overlay" id="boon-view" aria-label="Улучшение" hidden><div class="boon-panel"><h2>Перед следующим спуском</h2><p>Выбери одну находку.</p><div class="boons" id="boon-options"></div></div></section>
+    <section class="overlay" id="over-view" aria-label="Попытка окончена" hidden><div class="paper"><h2>Свет погас.</h2><p class="intro">Но лестница вниз всё ещё здесь.</p><div class="stats"><div><strong id="end-floor">1</strong><span>ЭТАЖ</span></div><div><strong id="end-score">0</strong><span>ОЧКОВ</span></div><div><strong id="end-best">0</strong><span>РЕКОРД</span></div></div><button class="primary" id="again-button">Ещё один спуск <span>↓</span></button></div></section>
+    <div class="dpad" id="dpad" aria-label="Управление" hidden><button class="up" data-step="0,-1" aria-label="Шаг вверх">↑</button><button class="left" data-step="-1,0" aria-label="Шаг влево">←</button><button class="wait" data-step="0,0" aria-label="Подождать ход">·</button><button class="right" data-step="1,0" aria-label="Шаг вправо">→</button><button class="down" data-step="0,1" aria-label="Шаг вниз">↓</button></div>
+    <div class="toast" id="toast" role="status" hidden></div>
+  </main>
+  <noscript>Для игры нужен JavaScript. Включи его в настройках браузера.</noscript>
+  <script id="vault-core">
+  (() => {
+    'use strict';
+    const WIDTH = 15;
+    const HEIGHT = 11;
+    const DIRECTIONS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+    const indexOf = (x, y) => y * WIDTH + x;
+    const distance = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+
+    function shuffle(items, random) {
+      for (let i = items.length - 1; i > 0; i--) {
+        const next = Math.floor(random() * (i + 1));
+        [items[i], items[next]] = [items[next], items[i]];
+      }
+      return items;
+    }
+
+    function distances(tiles, start) {
+      const result = new Map([[indexOf(start.x, start.y), 0]]);
+      const queue = [start];
+      for (let head = 0; head < queue.length; head++) {
+        const cell = queue[head];
+        const depth = result.get(indexOf(cell.x, cell.y));
+        for (const [dx, dy] of DIRECTIONS) {
+          const x = cell.x + dx;
+          const y = cell.y + dy;
+          const id = indexOf(x, y);
+          if (tiles[y]?.[x] !== 0 || result.has(id)) continue;
+          result.set(id, depth + 1);
+          queue.push({ x, y });
+        }
+      }
+      return result;
+    }
+
+    function generateDungeon(floor, random = Math.random) {
+      const tiles = Array.from({ length: HEIGHT }, () => Array(WIDTH).fill(1));
+      const spawn = { x: 1, y: 1 };
+      const stack = [{ ...spawn }];
+      tiles[1][1] = 0;
+      while (stack.length) {
+        const cell = stack[stack.length - 1];
+        const options = shuffle(DIRECTIONS.slice(), random).filter(([dx, dy]) => {
+          const x = cell.x + dx * 2;
+          const y = cell.y + dy * 2;
+          return x > 0 && y > 0 && x < WIDTH - 1 && y < HEIGHT - 1 && tiles[y][x] === 1;
+        });
+        if (!options.length) { stack.pop(); continue; }
+        const [dx, dy] = options[0];
+        tiles[cell.y + dy][cell.x + dx] = 0;
+        const next = { x: cell.x + dx * 2, y: cell.y + dy * 2 };
+        tiles[next.y][next.x] = 0;
+        stack.push(next);
+      }
+      // A few loops offer ways to dodge a warned attack and revisit explored halls.
+      const walls = [];
+      for (let y = 1; y < HEIGHT - 1; y++) {
+        for (let x = 1; x < WIDTH - 1; x++) {
+          if (!tiles[y][x]) continue;
+          const horizontal = tiles[y][x - 1] === 0 && tiles[y][x + 1] === 0;
+          const vertical = tiles[y - 1][x] === 0 && tiles[y + 1][x] === 0;
+          if (horizontal || vertical) walls.push({ x, y });
+        }
+      }
+      for (const wall of shuffle(walls, random).slice(0, 5)) tiles[wall.y][wall.x] = 0;
+
+      const reachable = distances(tiles, spawn);
+      const cells = [...reachable].map(([id, steps]) => ({ x: id % WIDTH, y: Math.floor(id / WIDTH), steps }));
+      cells.sort((a, b) => b.steps - a.steps);
+      const exit = { x: cells[0].x, y: cells[0].y };
+      const keyChoices = cells.filter(cell => cell.steps >= cells[0].steps * 0.5 && distance(cell, exit) > 3);
+      const keyCell = keyChoices[Math.floor(random() * keyChoices.length)] || cells[1];
+      const key = { x: keyCell.x, y: keyCell.y };
+      const occupied = new Set([indexOf(spawn.x, spawn.y), indexOf(exit.x, exit.y), indexOf(key.x, key.y)]);
+      const candidates = shuffle(cells.filter(cell => cell.steps > 2), random);
+      const takeCell = predicate => {
+        const cell = candidates.find(candidate => !occupied.has(indexOf(candidate.x, candidate.y)) && predicate(candidate));
+        if (!cell) return null;
+        occupied.add(indexOf(cell.x, cell.y));
+        return { x: cell.x, y: cell.y };
+      };
+      const gems = [];
+      for (let i = 0; i < 7; i++) {
+        const cell = takeCell(() => true);
+        if (cell) gems.push(cell);
+      }
+      const heals = [];
+      for (let i = 0; i < 2; i++) {
+        const cell = takeCell(() => true);
+        if (cell) heals.push(cell);
+      }
+      const chest = takeCell(cell => cell.steps > 6);
+      const enemies = [];
+      const count = Math.min(9, 2 + Math.ceil(floor * 0.75));
+      for (let i = 0; i < count; i++) {
+        const cell = takeCell(candidate => candidate.steps >= 7 && distance(candidate, key) > 1 && distance(candidate, exit) > 1 && enemies.every(enemy => distance(enemy, candidate) > 1));
+        if (!cell) break;
+        const guardian = floor > 1 && i % 3 === 0;
+        const hp = guardian ? Math.min(14, 4 + Math.floor(floor / 2)) : Math.min(10, 3 + Math.floor(floor / 3));
+        enemies.push({ ...cell, home: { ...cell }, id: i, kind: guardian ? 'guardian' : 'slime', hp, maxHp: hp, damage: guardian ? Math.min(5, 2 + Math.floor(floor / 5)) : Math.min(4, 1 + Math.floor(floor / 6)), phase: i % 3, warning: null });
+      }
+      return { width: WIDTH, height: HEIGHT, tiles, spawn, key, exit, gems, heals, chest, enemies };
+    }
+
+    class VaultGame {
+      constructor({ random = Math.random, onChange, onEvent } = {}) {
+        this.random = random;
+        this.onChange = onChange;
+        this.onEvent = onEvent;
+        this.best = 0;
+        try {
+          const stored = Number(localStorage.getItem('vault-best'));
+          if (Number.isFinite(stored) && stored > 0) this.best = Math.floor(stored);
+        } catch {}
+        this.reset('menu');
+      }
+
+      reset(mode = 'playing') {
+        this.mode = mode;
+        this.floor = 1;
+        this.hp = 12;
+        this.maxHp = 12;
+        this.damage = 2;
+        this.sight = 4;
+        this.shield = 0;
+        this.score = 0;
+        this.turns = 0;
+        this.boons = [];
+        this.buildFloor();
+      }
+
+      buildFloor() {
+        this.dungeon = generateDungeon(this.floor, this.random);
+        this.player = { ...this.dungeon.spawn };
+        this.hasKey = false;
+        this.explored = new Set();
+        this.visible = new Set();
+        this.updateFog();
+      }
+
+      start() { this.reset(); this.notify(); }
+      pause() {
+        if (this.mode !== 'playing') return;
+        this.mode = 'paused';
+        this.notify();
+      }
+      resume() {
+        if (this.mode !== 'paused') return;
+        this.mode = 'playing';
+        this.notify();
+      }
+      togglePause() {
+        if (this.mode === 'playing') this.pause();
+        else if (this.mode === 'paused') this.resume();
+      }
+      notify() { this.onChange?.(this.getState()); }
+      emit(type, details = {}) { this.onEvent?.({ type, ...details }); }
+      getState() {
+        return { mode: this.mode, floor: this.floor, hp: this.hp, maxHp: this.maxHp, damage: this.damage, sight: this.sight, shield: this.shield, hasKey: this.hasKey, score: this.score, best: this.best, turns: this.turns };
+      }
+      enemyAt(x, y) { return this.dungeon.enemies.find(enemy => enemy.hp > 0 && enemy.x === x && enemy.y === y); }
+
+      move(dx, dy) {
+        if (this.mode !== 'playing' || !Number.isInteger(dx) || !Number.isInteger(dy) || Math.abs(dx) + Math.abs(dy) > 1) return false;
+        const x = this.player.x + dx;
+        const y = this.player.y + dy;
+        if (this.dungeon.tiles[y]?.[x] !== 0) return false;
+        const enemy = this.enemyAt(x, y);
+        this.turns++;
+        if (enemy) {
+          enemy.hp = Math.max(0, enemy.hp - this.damage);
+          this.emit('attack');
+          if (!enemy.hp) {
+            this.score += enemy.kind === 'guardian' ? 50 : 30;
+            this.dungeon.enemies = this.dungeon.enemies.filter(other => other.hp > 0);
+            this.emit('defeat');
+          }
+        } else {
+          this.player.x = x;
+          this.player.y = y;
+          this.collect();
+          if (this.hasKey && distance(this.player, this.dungeon.exit) === 0) {
+            this.score += 200 + this.floor * 25;
+            this.offerBoons();
+          }
+        }
+        if (this.mode === 'playing') this.enemyTurn();
+        this.updateFog();
+        this.saveBest();
+        this.notify();
+        return true;
+      }
+
+      collect() {
+        const here = cell => distance(cell, this.player) === 0;
+        const d = this.dungeon;
+        if (d.key && here(d.key)) { d.key = null; this.hasKey = true; this.score += 50; this.emit('key'); }
+        const gem = d.gems.findIndex(here);
+        if (gem >= 0) { d.gems.splice(gem, 1); this.score += 25; this.emit('gem'); }
+        const heal = d.heals.findIndex(here);
+        if (heal >= 0) { d.heals.splice(heal, 1); this.hp = Math.min(this.maxHp, this.hp + 4); this.emit('heal'); }
+        if (d.chest && here(d.chest)) { d.chest = null; this.score += 100; this.emit('chest'); }
+        if (here(d.exit) && !this.hasKey) this.emit('locked');
+      }
+
+      enemyTurn() {
+        const d = this.dungeon;
+        for (const enemy of d.enemies) {
+          if (this.mode !== 'playing') break;
+          if (enemy.warning) {
+            if (distance(this.player, enemy.warning) === 0) this.takeDamage(enemy.damage);
+            enemy.warning = null;
+            continue;
+          }
+          if (distance(enemy, this.player) === 1) {
+            enemy.warning = { ...this.player };
+            continue;
+          }
+          if ((this.turns + enemy.phase) % (enemy.kind === 'slime' ? 2 : 1) !== 0) continue;
+          const reach = enemy.kind === 'guardian' ? 6 : 4;
+          const path = this.nextStep(enemy, this.player, reach);
+          if (path) { enemy.x = path.x; enemy.y = path.y; continue; }
+          // Beyond the lantern, creatures patrol near their starting room.
+          if (this.turns % 3 !== enemy.phase) continue;
+          const directions = DIRECTIONS.slice(enemy.phase).concat(DIRECTIONS.slice(0, enemy.phase));
+          for (const [dx, dy] of directions) {
+            const next = { x: enemy.x + dx, y: enemy.y + dy };
+            if (d.tiles[next.y]?.[next.x] !== 0 || this.enemyAt(next.x, next.y) || distance(next, this.player) === 0 || distance(next, enemy.home) > 3) continue;
+            enemy.x = next.x; enemy.y = next.y;
+            break;
+          }
+        }
+      }
+
+      nextStep(enemy, target, limit) {
+        const queue = [{ x: enemy.x, y: enemy.y, first: null, depth: 0 }];
+        const seen = new Set([indexOf(enemy.x, enemy.y)]);
+        for (let head = 0; head < queue.length; head++) {
+          const current = queue[head];
+          if (distance(current, target) === 0) return current.first;
+          if (current.depth >= limit) continue;
+          for (const [dx, dy] of DIRECTIONS) {
+            const x = current.x + dx;
+            const y = current.y + dy;
+            const id = indexOf(x, y);
+            if (this.dungeon.tiles[y]?.[x] !== 0 || seen.has(id) || this.enemyAt(x, y)) continue;
+            seen.add(id);
+            queue.push({ x, y, first: current.first || { x, y }, depth: current.depth + 1 });
+          }
+        }
+        return null;
+      }
+
+      takeDamage(amount) {
+        if (this.mode !== 'playing') return;
+        if (this.shield > 0) { this.shield--; this.emit('shield'); return; }
+        this.hp = Math.max(0, this.hp - amount);
+        this.emit('hurt', { amount });
+        if (!this.hp) { this.mode = 'over'; this.emit('over'); }
+      }
+
+      offerBoons() {
+        this.mode = 'boon';
+        const choices = [
+          { id: 'heart', symbol: '♥', title: 'Крепкое сердце', text: '+2 к запасу здоровья. Восстанови 4 здоровья.' },
+          { id: 'rest', symbol: '✣', title: 'Тихий привал', text: 'Полностью восстанови здоровье и получи 40 очков.' }
+        ];
+        if (this.damage < 8) choices.push({ id: 'edge', symbol: '†', title: 'Острая кромка', text: 'Твой клинок наносит на 1 больше урона.' });
+        if (this.sight < 7) choices.push({ id: 'light', symbol: '☼', title: 'Яркий фитиль', text: 'Фонарь освещает на одну клетку дальше.' });
+        if (this.shield < 6) choices.push({ id: 'shield', symbol: '◇', title: 'Оберег', text: 'Следующие два удара не причинят вреда. До 6 зарядов.' });
+        // A shield at its cap becomes a useful score-and-heal choice again later.
+        if (choices.length < 3) choices.push({ id: 'fortune', symbol: '◈', title: 'Забытый кошель', text: 'Получи 120 очков за найденное золото.' });
+        this.boons = shuffle(choices, this.random).slice(0, 3);
+        this.emit('floor');
+      }
+
+      chooseBoon(id) {
+        if (this.mode !== 'boon' || !this.boons.some(boon => boon.id === id)) return false;
+        if (id === 'heart') { this.maxHp += 2; this.hp = Math.min(this.maxHp, this.hp + 4); }
+        if (id === 'rest') { this.hp = this.maxHp; this.score += 40; }
+        if (id === 'edge') this.damage++;
+        if (id === 'light') this.sight++;
+        if (id === 'shield') this.shield = Math.min(6, this.shield + 2);
+        if (id === 'fortune') this.score += 120;
+        this.floor++;
+        this.boons = [];
+        this.buildFloor();
+        this.mode = 'playing';
+        this.saveBest();
+        this.notify();
+        return true;
+      }
+
+      updateFog() {
+        const reachable = distances(this.dungeon.tiles, this.player);
+        this.visible = new Set();
+        for (const [id, steps] of reachable) {
+          if (steps > this.sight) continue;
+          this.visible.add(id);
+          const x = id % WIDTH;
+          const y = Math.floor(id / WIDTH);
+          for (const [dx, dy] of DIRECTIONS) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx >= 0 && ny >= 0 && nx < WIDTH && ny < HEIGHT && this.dungeon.tiles[ny][nx] === 1) this.visible.add(indexOf(nx, ny));
+          }
+        }
+        for (const id of this.visible) this.explored.add(id);
+      }
+
+      saveBest() {
+        if (this.score <= this.best) return;
+        this.best = this.score;
+        try { localStorage.setItem('vault-best', String(this.best)); } catch {}
+      }
+    }
+    VaultGame.generateDungeon = generateDungeon;
+    window.VaultGame = VaultGame;
+  })();
+  </script>
+  <script>
+  (() => {
+    'use strict';
+    const $ = id => document.getElementById(id);
+    const canvas = $('board');
+    const context = canvas.getContext('2d');
+    const overlays = { menu: $('menu-view'), paused: $('pause-view'), boon: $('boon-view'), over: $('over-view') };
+    let renderPending = false;
+    let width = 1000;
+    let height = 700;
+    let scale = 1;
+    let tile = 50;
+    let originX = 0;
+    let originY = 0;
+    let currentMode = 'menu';
+    let boonSignature = '';
+    let toastTimeout;
+    let starting = false;
+    const game = new window.VaultGame({ onChange: update, onEvent: handleEvent });
+    window.vaultGame = game;
+
+    function requestRender() {
+      if (renderPending) return;
+      renderPending = true;
+      requestAnimationFrame(() => { renderPending = false; draw(); });
+    }
+
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      width = rect.width;
+      height = rect.height;
+      scale = Math.min(1, 1200 / Math.max(1, width), 800 / Math.max(1, height));
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      const touch = matchMedia('(pointer: coarse), (max-width: 600px)').matches;
+      const top = width < 650 ? 62 : 72;
+      const bottom = touch ? 156 : 35;
+      tile = Math.max(12, Math.min(64, (width - 24) / 15, (height - top - bottom) / 11));
+      originX = (width - tile * 15) / 2;
+      originY = top + Math.max(0, (height - top - bottom - tile * 11) / 2);
+      requestRender();
+    }
+
+    function update(state) {
+      for (const [mode, overlay] of Object.entries(overlays)) overlay.hidden = state.mode !== mode;
+      const playing = state.mode === 'playing';
+      $('hud').hidden = !playing;
+      $('dpad').hidden = !playing;
+      $('floor-label').textContent = `Этаж ${state.floor}`;
+      $('hp-label').textContent = `${state.hp}/${state.maxHp}`;
+      $('health-fill').style.width = `${Math.max(0, state.hp / state.maxHp * 100)}%`;
+      $('key-label').textContent = state.hasKey ? 'Есть' : '—';
+      $('key-status').classList.toggle('found', state.hasKey);
+      $('shield-label').hidden = state.shield === 0;
+      $('shield-label').textContent = `◇ ${state.shield}`;
+      $('score-label').textContent = state.score.toLocaleString('ru-RU');
+      $('best-label').textContent = state.best.toLocaleString('ru-RU');
+      if (state.mode === 'boon') showBoons();
+      if (state.mode === 'over') {
+        $('end-floor').textContent = state.floor;
+        $('end-score').textContent = state.score.toLocaleString('ru-RU');
+        $('end-best').textContent = state.best.toLocaleString('ru-RU');
+      }
+      if (state.mode !== currentMode) {
+        $('toast').hidden = true;
+        if (playing) canvas.focus({ preventScroll: true });
+        if (state.mode === 'paused') $('resume-button').focus({ preventScroll: true });
+        if (state.mode === 'over') $('again-button').focus({ preventScroll: true });
+        currentMode = state.mode;
+      }
+      requestRender();
+    }
+
+    function showBoons() {
+      const signature = game.floor + ':' + game.boons.map(boon => boon.id).join(',');
+      if (signature === boonSignature) return;
+      boonSignature = signature;
+      $('boon-options').replaceChildren();
+      for (const boon of game.boons) {
+        const button = document.createElement('button');
+        button.className = 'boon';
+        const symbol = document.createElement('span');
+        symbol.className = 'boon-symbol'; symbol.textContent = boon.symbol;
+        const title = document.createElement('h3'); title.textContent = boon.title;
+        const text = document.createElement('p'); text.textContent = boon.text;
+        button.append(symbol, title, text);
+        button.addEventListener('click', () => game.chooseBoon(boon.id));
+        $('boon-options').append(button);
+      }
+      $('boon-options').firstElementChild?.focus({ preventScroll: true });
+    }
+
+    function handleEvent(event) {
+      const messages = {
+        key: 'Ключ найден. Теперь к двери.', heal: '+4 здоровья', chest: 'Сундук · +100 очков',
+        locked: 'Для двери нужен золотой ключ.', shield: 'Оберег принял удар.',
+        hurt: `Удар · −${event.amount || 0} здоровья`
+      };
+      if (!messages[event.type]) return;
+      $('toast').textContent = messages[event.type];
+      $('toast').hidden = false;
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => { $('toast').hidden = true; }, 1800);
+    }
+
+    function ellipse(c, x, y, rx, ry, fill) {
+      c.fillStyle = fill;
+      c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fill();
+    }
+
+    function drawCell(x, y, wall, visible) {
+      const c = context;
+      const left = originX + x * tile;
+      const top = originY + y * tile;
+      const seed = (x * 31 + y * 17) % 7;
+      c.fillStyle = wall ? (visible ? '#444b4d' : '#30373b') : (visible ? '#62635a' : '#3c4547');
+      c.fillRect(left + 1, top + 1, tile - 2, tile - 2);
+      if (wall) {
+        c.fillStyle = visible ? '#565a56' : '#394246';
+        c.fillRect(left + 3, top + 3, tile - 6, Math.max(2, tile * 0.12));
+        c.strokeStyle = visible ? '#282f32' : '#293237'; c.lineWidth = 1;
+        c.beginPath();
+        c.moveTo(left + tile * 0.1, top + tile * 0.52);
+        c.lineTo(left + tile * 0.9, top + tile * 0.52);
+        c.moveTo(left + tile * (seed % 2 ? 0.35 : 0.7), top + tile * 0.54);
+        c.lineTo(left + tile * (seed % 2 ? 0.35 : 0.7), top + tile - 3); c.stroke();
+      } else {
+        c.strokeStyle = visible ? '#73716670' : '#475252'; c.lineWidth = 1;
+        c.strokeRect(left + 3, top + 3, tile - 6, tile - 6);
+        if (seed === 2 || seed === 5) {
+          c.strokeStyle = visible ? '#4c514c' : '#364045';
+          c.beginPath(); c.moveTo(left + tile * 0.3, top + tile * 0.2); c.lineTo(left + tile * 0.45, top + tile * 0.5); c.lineTo(left + tile * 0.38, top + tile * 0.73); c.stroke();
+        }
+      }
+    }
+
+    function atCell(cell, drawItem) {
+      if (!cell || !game.explored.has(cell.y * 15 + cell.x)) return;
+      const c = context;
+      c.save();
+      c.globalAlpha = game.visible.has(cell.y * 15 + cell.x) ? 1 : 0.4;
+      c.translate(originX + (cell.x + 0.5) * tile, originY + (cell.y + 0.5) * tile);
+      c.scale(tile / 50, tile / 50);
+      drawItem(c);
+      c.restore();
+    }
+
+    function drawKey(c) {
+      c.strokeStyle = '#e3bd72'; c.lineWidth = 4; c.lineCap = 'round';
+      c.beginPath(); c.arc(-5, -5, 6, 0, Math.PI * 2); c.moveTo(0, 0); c.lineTo(12, 12); c.moveTo(8, 8); c.lineTo(13, 3); c.stroke();
+      c.strokeStyle = '#85704c'; c.lineWidth = 1;
+      c.beginPath(); c.arc(-5, -5, 9, 0, Math.PI * 2); c.stroke();
+    }
+
+    function drawExit(c) {
+      c.fillStyle = '#353f40'; c.fillRect(-17, -16, 34, 34);
+      c.strokeStyle = game.hasKey ? '#d9b570' : '#91866a'; c.lineWidth = 4;
+      c.beginPath(); c.moveTo(-15, 17); c.lineTo(-15, -8); c.quadraticCurveTo(-15, -23, 0, -23); c.quadraticCurveTo(15, -23, 15, -8); c.lineTo(15, 17); c.stroke();
+      c.fillStyle = '#242e31'; c.fillRect(-10, -9, 20, 25);
+      for (let i = 0; i < 3; i++) { c.fillStyle = ['#586061', '#727568', '#97927a'][i]; c.fillRect(-9 + i * 2, 1 + i * 5, 18 - i * 4, 3); }
+      c.strokeStyle = '#d0b37b'; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(0, -16); c.lineTo(0, -4); c.moveTo(-4, -8); c.lineTo(0, -4); c.lineTo(4, -8); c.stroke();
+    }
+
+    function drawGem(c) {
+      c.fillStyle = '#96b0a4'; c.strokeStyle = '#ced1ac'; c.lineWidth = 1.3;
+      c.beginPath(); c.moveTo(0, -10); c.lineTo(8, -2); c.lineTo(0, 10); c.lineTo(-8, -2); c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = '#c0cbb0'; c.beginPath(); c.moveTo(0, -8); c.lineTo(0, 7); c.lineTo(-6, -2); c.closePath(); c.fill();
+    }
+
+    function drawHeal(c) {
+      c.fillStyle = '#c6c4ad'; c.fillRect(-7, -7, 14, 21);
+      c.fillStyle = '#8f6a50'; c.fillRect(-5, -13, 10, 6);
+      c.fillStyle = '#b77c69'; c.fillRect(-3, -2, 6, 12); c.fillRect(-6, 1, 12, 5);
+      c.strokeStyle = '#e0d4af'; c.lineWidth = 1; c.strokeRect(-7, -7, 14, 21);
+    }
+
+    function drawChest(c) {
+      c.fillStyle = '#97734a'; c.fillRect(-15, -9, 30, 25);
+      c.fillStyle = '#b6955d'; c.fillRect(-15, -11, 30, 11);
+      c.strokeStyle = '#5d5241'; c.lineWidth = 2; c.strokeRect(-15, -11, 30, 27);
+      c.fillStyle = '#d5ba76'; c.fillRect(-11, -10, 3, 25); c.fillRect(8, -10, 3, 25); c.fillRect(-3, -3, 6, 8);
+    }
+
+    function drawEnemy(c, enemy) {
+      ellipse(c, 0, 13, 16, 5, '#28303280');
+      if (enemy.kind === 'slime') {
+        c.fillStyle = '#87936d'; c.strokeStyle = '#48554b'; c.lineWidth = 2;
+        c.beginPath(); c.moveTo(-16, 10); c.bezierCurveTo(-16, -18, 14, -20, 16, 10); c.quadraticCurveTo(0, 20, -16, 10); c.fill(); c.stroke();
+        ellipse(c, -6, -7, 5, 3, '#abb08a');
+        ellipse(c, -5, 2, 2, 3, '#283b34'); ellipse(c, 6, 2, 2, 3, '#283b34');
+      } else {
+        c.fillStyle = '#59666c'; c.strokeStyle = '#b4ae94'; c.lineWidth = 1.5;
+        c.beginPath(); c.moveTo(-12, -4); c.lineTo(12, -4); c.lineTo(15, 16); c.lineTo(-15, 16); c.closePath(); c.fill(); c.stroke();
+        c.fillStyle = '#8d9693'; c.fillRect(-13, -20, 26, 21);
+        c.fillStyle = '#34444b'; c.fillRect(-10, -10, 20, 5);
+        c.fillStyle = '#c5bb99'; c.fillRect(-2, -21, 4, 22);
+        c.strokeStyle = '#a6a993'; c.lineWidth = 3; c.beginPath(); c.moveTo(20, 13); c.lineTo(20, -18); c.moveTo(15, 1); c.lineTo(25, 1); c.stroke();
+      }
+      if (enemy.hp < enemy.maxHp) {
+        c.fillStyle = '#283335'; c.fillRect(-15, -27, 30, 4);
+        c.fillStyle = '#c5a584'; c.fillRect(-15, -27, 30 * enemy.hp / enemy.maxHp, 4);
+      }
+      if (enemy.warning) {
+        c.font = 'bold 18px Georgia, serif'; c.textAlign = 'center'; c.fillStyle = '#e2b394'; c.fillText('!', 0, -31);
+      }
+    }
+
+    function drawPlayer(c) {
+      ellipse(c, 0, 16, 16, 5, '#202a2c90');
+      c.fillStyle = '#5d443a'; c.fillRect(-10, 7, 7, 13); c.fillRect(3, 7, 7, 13);
+      c.fillStyle = '#9c7759'; c.strokeStyle = '#cfad78'; c.lineWidth = 1.5;
+      c.beginPath(); c.moveTo(0, -19); c.lineTo(-15, 13); c.lineTo(15, 13); c.closePath(); c.fill(); c.stroke();
+      ellipse(c, 0, -8, 9, 12, '#bf9b71');
+      c.fillStyle = '#343e3e'; c.fillRect(-6, -10, 12, 6);
+      c.strokeStyle = '#c2ccc2'; c.lineWidth = 3; c.beginPath(); c.moveTo(-19, 10); c.lineTo(-19, -15); c.moveTo(-24, 3); c.lineTo(-14, 3); c.stroke();
+      ellipse(c, 18, 3, 15, 17, '#d0a7531f');
+      c.strokeStyle = '#d8ba79'; c.lineWidth = 2; c.strokeRect(13, -3, 11, 16);
+      c.fillStyle = '#e2c278'; c.fillRect(16, 0, 5, 10);
+      c.strokeStyle = '#bd9b62'; c.lineWidth = 1.5; c.beginPath(); c.arc(18.5, -4, 4, Math.PI, 0); c.stroke();
+    }
+
+    function draw() {
+      const c = context;
+      c.setTransform(scale, 0, 0, scale, 0, 0);
+      c.fillStyle = '#252c30'; c.fillRect(0, 0, width, height);
+      c.fillStyle = '#1e272c'; c.fillRect(originX - 8, originY - 8, tile * 15 + 16, tile * 11 + 16);
+      c.strokeStyle = '#b9ac7c1a'; c.lineWidth = 1;
+      c.strokeRect(originX - 8, originY - 8, tile * 15 + 16, tile * 11 + 16);
+      for (let y = 0; y < 11; y++) {
+        for (let x = 0; x < 15; x++) {
+          const id = y * 15 + x;
+          if (!game.explored.has(id)) {
+            c.fillStyle = (x + y) % 2 ? '#222c31' : '#242e33';
+            c.fillRect(originX + x * tile + 1, originY + y * tile + 1, tile - 2, tile - 2);
+          } else drawCell(x, y, game.dungeon.tiles[y][x], game.visible.has(id));
+        }
+      }
+      for (const enemy of game.dungeon.enemies) {
+        if (!enemy.warning || !game.visible.has(enemy.y * 15 + enemy.x)) continue;
+        const x = originX + enemy.warning.x * tile;
+        const y = originY + enemy.warning.y * tile;
+        c.fillStyle = '#b178605c'; c.fillRect(x + 2, y + 2, tile - 4, tile - 4);
+        c.strokeStyle = '#d29b78'; c.lineWidth = 2; c.strokeRect(x + 3, y + 3, tile - 6, tile - 6);
+      }
+      atCell(game.dungeon.exit, drawExit);
+      atCell(game.dungeon.key, drawKey);
+      for (const gem of game.dungeon.gems) atCell(gem, drawGem);
+      for (const heal of game.dungeon.heals) atCell(heal, drawHeal);
+      atCell(game.dungeon.chest, drawChest);
+      for (const enemy of game.dungeon.enemies) {
+        if (game.visible.has(enemy.y * 15 + enemy.x)) atCell(enemy, context => drawEnemy(context, enemy));
+      }
+      atCell(game.player, drawPlayer);
+    }
+
+    async function start() {
+      if (starting) return;
+      starting = true;
+      boonSignature = '';
+      clearTimeout(toastTimeout);
+      $('toast').hidden = true;
+      try {
+        await enterFullscreen();
+        game.start();
+      } finally { starting = false; }
+    }
+    async function enterFullscreen() {
+      if (document.fullscreenElement || !document.fullscreenEnabled) return;
+      try { await document.documentElement.requestFullscreen({ navigationUI: 'hide' }); } catch {}
+    }
+    async function fullscreen() {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await enterFullscreen();
+      } catch {}
+    }
+    function syncFullscreen() {
+      const active = Boolean(document.fullscreenElement);
+      $('fullscreen-button').setAttribute('aria-label', active ? 'Выйти из полного экрана' : 'Полный экран');
+      $('pause-fullscreen').textContent = active ? 'Выйти из полного экрана' : 'Полный экран';
+      resize();
+    }
+    $('start-button').addEventListener('click', start);
+    $('again-button').addEventListener('click', start);
+    $('restart-button').addEventListener('click', start);
+    $('resume-button').addEventListener('click', () => game.resume());
+    $('pause-button').addEventListener('click', () => game.pause());
+    $('fullscreen-button').addEventListener('click', fullscreen);
+    $('pause-fullscreen').addEventListener('click', fullscreen);
+    document.querySelectorAll('[data-step]').forEach(button => {
+      button.addEventListener('click', () => {
+        const [dx, dy] = button.dataset.step.split(',').map(Number);
+        game.move(dx, dy);
+      });
+    });
+    const steps = { ArrowUp: [0, -1], KeyW: [0, -1], ArrowLeft: [-1, 0], KeyA: [-1, 0], ArrowDown: [0, 1], KeyS: [0, 1], ArrowRight: [1, 0], KeyD: [1, 0], Space: [0, 0] };
+    window.addEventListener('keydown', event => {
+      if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.code === 'KeyF') { event.preventDefault(); fullscreen(); return; }
+      if (event.code === 'Escape' || event.code === 'KeyP') { event.preventDefault(); game.togglePause(); return; }
+      if (game.mode !== 'playing' || !steps[event.code]) return;
+      event.preventDefault();
+      game.move(...steps[event.code]);
+    });
+    window.addEventListener('blur', () => game.pause());
+    document.addEventListener('visibilitychange', () => { if (document.hidden) game.pause(); });
+    document.addEventListener('fullscreenchange', syncFullscreen);
+    window.addEventListener('resize', resize);
+    new ResizeObserver(resize).observe(canvas);
+    $('fullscreen-button').hidden = !document.fullscreenEnabled;
+    $('pause-fullscreen').hidden = !document.fullscreenEnabled;
+    resize();
+    update(game.getState());
+  })();
+  </script>
+</body>
+</html>

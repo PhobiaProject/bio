@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#ebe7d5">
+  <title>Портовый кран</title>
+  <style>
+    :root { color-scheme: light; font-family: "Trebuchet MS", "Segoe UI", sans-serif; color: #344f49; background: #ebe7d5; }
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; touch-action: none; }
+    button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    button:focus-visible { outline: 3px solid #ba8056; outline-offset: 4px; }
+    [hidden] { display: none !important; }
+    #harbor { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
+    .hud { position: fixed; top: max(15px,env(safe-area-inset-top)); left: max(16px,env(safe-area-inset-left)); right: max(16px,env(safe-area-inset-right)); display: flex; justify-content: space-between; align-items: start; gap: 10px; pointer-events: none; }
+    .stats { display: flex; align-items: center; gap: 17px; padding: 12px 17px; border-radius: 8px; border: 1px solid #fff8e8b3; background: #f5f0dff2; box-shadow: 0 2px 10px #3b62531c; }
+    .score strong { display: block; min-width: 62px; font: bold 27px/1 Georgia,serif; }
+    .score small { display: block; margin-top: 5px; color: #8b9a82; font-size: 9px; }
+    .divider { height: 30px; width: 1px; background: #d0d9c4; }
+    .height { text-align: center; min-width: 35px; }
+    .height strong { display: block; font: 24px/1 Georgia,serif; }
+    .height small { display: block; margin-top: 5px; color: #8b9a82; font-size: 9px; }
+    .lives { color: #b97d5e; font-size: 18px; letter-spacing: 3px; }
+    .actions { display: flex; gap: 8px; pointer-events: auto; }
+    .icon-button { width: 38px; height: 38px; display: grid; place-items: center; padding: 0; background: #f5f0dff2; color: #55756a; border: 1px solid #fff9e2ae; border-radius: 8px; }
+    .icon-button:hover { background: #fff9e9; }
+    .icon-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+    .release { position: fixed; right: max(22px,env(safe-area-inset-right)); bottom: max(22px,env(safe-area-inset-bottom)); width: 63px; height: 63px; border-radius: 50%; border: 1px solid #efe8cbbf; background: #42685ee8; box-shadow: 0 3px 0 #2a51474d; color: #f5edcf; font: 34px Georgia,serif; touch-action: none; }
+    .release:active { background: #729182; transform: translateY(2px); }
+    .release:disabled { opacity: .6; cursor: default; }
+    .overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 18px; background: #365b5130; }
+    .card { position: relative; width: min(390px,100%); padding: 29px 30px 24px; text-align: center; background: #f6f0de; border: 1px solid #fff8e7; border-radius: 6px 21px 7px 21px; box-shadow: 0 17px 65px #294f4638,0 2px 0 #dfdfc9; }
+    .card:before { content: ""; position: absolute; inset: 7px; border: 1px solid #6d8b6c30; border-radius: 2px 15px 3px 15px; pointer-events: none; }
+    .mark { display: block; width: 76px; height: 63px; margin: 0 auto 9px; }
+    .eyebrow { color: #91a087; font: italic 12px Georgia,serif; margin-bottom: 13px; }
+    h1,h2 { font: normal 44px/1 Georgia,serif; letter-spacing: -1.2px; margin: 0 0 17px; }
+    h2 { font-size: 36px; }
+    p { font-size: 12px; line-height: 1.7; color: #82927b; margin: 0 0 20px; }
+    .instructions { padding: 13px 8px; border-top: 1px solid #dce0c9; border-bottom: 1px solid #dce0c9; color: #69806d; font-size: 11px; line-height: 1.7; margin: 20px 0; }
+    kbd { font: bold 10px "Trebuchet MS",sans-serif; color: #567563; padding: 3px 6px; border: 1px solid #c7d0b9; border-bottom-width: 2px; border-radius: 3px; background: #e9e9d3; }
+    .primary,.secondary { width: 100%; padding: 14px 16px; display: block; border-radius: 5px; font-size: 13px; font-weight: bold; }
+    .primary { background: #466f60; border: 1px solid #466f60; color: #fcf4d9; }
+    .primary:hover { background: #345a4d; }
+    .secondary { background: transparent; border: 1px solid #c7d1b8; color: #6c856e; padding: 11px; margin-top: 9px; }
+    .best { color: #9ca78c; font-size: 10px; margin-top: 16px; }
+    .results { display: flex; justify-content: center; gap: 25px; margin: 24px 0; }
+    .results strong { display: block; font: 30px Georgia,serif; }
+    .results small { color: #93a084; font-size: 10px; }
+    .sound { display: flex; gap: 8px; justify-content: center; align-items: center; margin-top: 17px; color: #8c9c83; font-size: 11px; }
+    .sound input { accent-color: #64856a; }
+    .mobile { display: none; }
+    @media(max-width:560px) { .hud { top: 10px; left: 10px; right: 10px; } .stats { padding: 10px 12px; gap: 10px; } .score strong { min-width: 44px; font-size: 23px; } .score small,.height small { font-size: 8px; } .height strong { font-size: 21px; } .lives { font-size: 16px; letter-spacing: 1px; } .icon-button { width: 32px; height: 32px; } .actions { gap: 5px; } .card { padding: 25px 25px 22px; } h1 { font-size: 40px; } }
+    @media(max-height:560px) { .mark,.eyebrow { display: none; } .card { padding: 22px 26px 19px; } h1 { font-size: 36px; margin-bottom: 12px; } p { margin-bottom: 12px; } .instructions { margin: 13px 0; padding: 10px 0; } .best { margin-top: 10px; } }
+    @media(pointer:coarse) { .keyboard { display: none; } .mobile { display: block; } }
+  </style>
+</head>
+<body>
+  <canvas id="harbor" tabindex="0" aria-label="Кран над контейнерами в порту"></canvas>
+  <div class="hud">
+    <div class="stats" aria-label="Результат погрузки">
+      <div class="score"><strong id="score">0</strong><small>очков</small></div>
+      <div class="divider"></div>
+      <div class="height"><strong id="height">0</strong><small>грузов</small></div>
+      <div class="divider"></div>
+      <div class="lives" id="lives" aria-label="3 попытки">♥♥♥</div>
+    </div>
+    <div class="actions">
+      <button class="icon-button" id="pause" aria-label="Пауза" title="Пауза · Esc"><svg viewBox="0 0 20 20"><path d="M7 4v12M13 4v12"/></svg></button>
+      <button class="icon-button" id="fullscreen" aria-label="Полный экран" title="Полный экран · F"><svg viewBox="0 0 20 20"><path d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5"/></svg></button>
+    </div>
+  </div>
+  <button class="release" id="release" aria-label="Отпустить контейнер" hidden>↓</button>
+  <div class="overlay" id="menu">
+    <section class="card" aria-labelledby="title">
+      <svg class="mark" viewBox="0 0 86 70" aria-hidden="true">
+        <path d="M10 65V6h57M9 8l32 19M9 31l32-23M64 7v24" fill="none" stroke="#bd9757" stroke-width="5"/>
+        <path d="M59 31h10v9H59z" fill="#5d7b68"/>
+        <path d="M28 43h48v24H28z" fill="#b87a53" stroke="#815b43" stroke-width="2"/>
+        <path d="M35 47v16M43 47v16M51 47v16M59 47v16M67 47v16" stroke="#d5a075" stroke-width="2"/>
+        <path d="M59 38L34 43M69 38l6 5" fill="none" stroke="#687f69" stroke-width="1.5"/>
+      </svg>
+      <div class="eyebrow">Тихая вода. Точная работа.</div>
+      <h1 id="title">Портовый<br>кран</h1>
+      <p>Построй самый высокий штабель.<br>Лишние края уйдут за борт —<br>ровные попадания принесут больше очков.</p>
+      <div class="instructions">
+        <span class="keyboard"><kbd>Пробел</kbd> или клик — отпустить груз.<br><kbd>Esc</kbd> — пауза · <kbd>F</kbd> — полный экран.</span>
+        <span class="mobile">Коснись экрана, чтобы отпустить груз.<br>Клади контейнеры ровно и береги три попытки.</span>
+      </div>
+      <button class="primary" id="start">Начать погрузку →</button>
+      <div class="best" id="menu-best">Первый рейс ещё впереди</div>
+    </section>
+  </div>
+  <div class="overlay" id="paused" hidden>
+    <section class="card" aria-labelledby="pause-title">
+      <div class="eyebrow">Перерыв у причала</div>
+      <h2 id="pause-title">Груз подождёт.</h2>
+      <p class="keyboard">Пробел или клик — отпустить контейнер.<br>Попади ровно, чтобы сохранить ширину.<br>Esc — продолжить. F — полный экран.</p>
+      <p class="mobile">Коснись экрана, чтобы отпустить контейнер.<br>Точные попадания сохраняют ширину штабеля.</p>
+      <button class="primary" id="resume">Продолжить погрузку</button>
+      <button class="secondary" id="restart">Начать сначала</button>
+      <label class="sound"><input type="checkbox" id="sound" checked> Звуки порта</label>
+    </section>
+  </div>
+  <div class="overlay" id="over" hidden>
+    <section class="card" aria-labelledby="over-title">
+      <div class="eyebrow">Смена закончена</div>
+      <h2 id="over-title">Можно отдать<br>швартовы.</h2>
+      <p>Корабль готов к рейсу.<br>Следующий штабель получится ещё выше.</p>
+      <div class="results"><div><strong id="final-score">0</strong><small>очков</small></div><div><strong id="final-height">0</strong><small>контейнеров</small></div><div><strong id="final-perfect">0</strong><small>точных</small></div></div>
+      <button class="primary" id="again">Ещё один рейс →</button>
+      <div class="best" id="final-best"></div>
+    </section>
+  </div>
+  <noscript>Для игры включи JavaScript в браузере.</noscript>
+  <script>
+  (() => {
+    'use strict';
+
+    const TAU = Math.PI * 2;
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const BEST_KEY = 'harbor-crane-best';
+    const CONTAINER_COLORS = [
+      { body: '#b97d58', light: '#d49e73', dark: '#8d6349' },
+      { body: '#6e9188', light: '#91aca0', dark: '#52756e' },
+      { body: '#b29e63', light: '#d2bb7c', dark: '#8e804f' },
+      { body: '#7b9470', light: '#a0b28b', dark: '#5c7757' },
+      { body: '#8b9da1', light: '#acb9b6', dark: '#6a7e7f' }
+    ];
+
+    class HarborGame {
+      constructor({ random = Math.random, onEvent = () => {} } = {}) {
+        this.random = random;
+        this.onEvent = onEvent;
+        this.width = 1000;
+        this.height = 700;
+        this.best = 0;
+        try {
+          const saved = Number(localStorage.getItem(BEST_KEY));
+          if (Number.isFinite(saved) && saved > 0) this.best = Math.floor(saved);
+        } catch {}
+        this.resize(this.width, this.height);
+        this.reset('menu');
+      }
+
+      resize(width, height) {
+        const previousWidth = this.width;
+        const previousBase = this.baseWidth || 1;
+        const previousHeight = this.containerHeight || 1;
+        this.width = Math.max(280, width);
+        this.height = Math.max(240, height);
+        this.baseWidth = clamp(this.width * 0.36, 150, 260);
+        this.containerHeight = clamp(this.height * 0.06, 29, 44);
+        this.minimumWidth = this.baseWidth * 0.26;
+        this.snapTolerance = Math.max(7, this.baseWidth * 0.035);
+        this.dropHeight = clamp(this.height * 0.22, 68, 160);
+        this.deckY = this.height * 0.82;
+        this.trackY = clamp(this.height * 0.105, 30, 80);
+        const stackScreenY = Math.min(this.height * 0.85, Math.max(this.height * 0.46, this.trackY + this.dropHeight + this.containerHeight + 62));
+        this.cameraThreshold = this.deckY - stackScreenY;
+        if (!this.stack) return;
+        const scaleX = this.baseWidth / previousBase;
+        const scaleY = this.containerHeight / previousHeight;
+        const blocks = [...this.stack, ...this.debris];
+        if (this.cargo) blocks.push(this.cargo);
+        for (const block of blocks) {
+          block.x = this.width / 2 + (block.x - previousWidth / 2) * scaleX;
+          block.width *= scaleX;
+          block.y *= scaleY;
+          block.height *= scaleY;
+          if (block.vy !== undefined) block.vy *= scaleY;
+        }
+        this.camera *= scaleY;
+        this.hookX = this.width / 2 + (this.hookX - previousWidth / 2) * scaleX;
+        if (this.cargo?.state === 'hanging') this.cargo.y = this.topY() + this.dropHeight;
+        // Screen-space feedback may be discarded on a viewport change.
+        this.particles.length = 0;
+        this.labels.length = 0;
+      }
+
+      reset(mode) {
+        this.mode = mode;
+        this.time = 0;
+        this.score = 0;
+        this.delivered = 0;
+        this.perfects = 0;
+        this.streak = 0;
+        this.lives = 3;
+        this.camera = 0;
+        this.shake = 0;
+        this.nextDelay = 0;
+        this.hookRetract = 0;
+        this.hookX = this.width / 2;
+        this.stack = [{ x: this.width / 2 - this.baseWidth / 2, y: 0, width: this.baseWidth, height: this.containerHeight, color: 1, id: 0 }];
+        this.debris = [];
+        this.particles = [];
+        this.labels = [];
+        this.cargo = null;
+        this.spawnCargo();
+      }
+
+      top() { return this.stack[this.stack.length - 1]; }
+      topY() { const top = this.top(); return top.y + top.height; }
+      screenY(worldY) { return this.deckY - worldY + this.camera; }
+
+      start() {
+        this.saveBest();
+        this.reset('playing');
+        this.onEvent({ type: 'start' });
+      }
+
+      pause() {
+        if (this.mode !== 'playing') return false;
+        this.mode = 'paused';
+        this.onEvent({ type: 'pause' });
+        return true;
+      }
+
+      resume() {
+        if (this.mode !== 'paused') return false;
+        this.mode = 'playing';
+        this.onEvent({ type: 'resume' });
+        return true;
+      }
+
+      togglePause() {
+        if (this.mode === 'playing') this.pause();
+        else if (this.mode === 'paused') this.resume();
+      }
+
+      saveBest() {
+        if (this.score <= this.best) return;
+        this.best = this.score;
+        try { localStorage.setItem(BEST_KEY, String(this.best)); } catch {}
+      }
+
+      spawnCargo() {
+        const top = this.top();
+        const phase = (this.delivered + (3 - this.lives)) % 2 === 0 ? -Math.PI / 2 : Math.PI / 2;
+        this.cargo = {
+          id: this.delivered + 1, x: top.x, y: this.topY() + this.dropHeight,
+          width: top.width, height: this.containerHeight, phase, angle: 0,
+          color: (this.delivered + 2) % CONTAINER_COLORS.length,
+          vy: 0, state: 'hanging'
+        };
+        this.positionCargo();
+        this.hookRetract = 0;
+      }
+
+      positionCargo() {
+        const cargo = this.cargo, top = this.top();
+        const span = Math.min(this.baseWidth * 1.05, (this.width - cargo.width - 38) / 2);
+        const centre = top.x + top.width / 2;
+        const left = Math.max(19, centre - cargo.width / 2 - span);
+        const right = Math.min(this.width - cargo.width - 19, centre - cargo.width / 2 + span);
+        cargo.x = left + (Math.sin(cargo.phase) + 1) / 2 * Math.max(0, right - left);
+        cargo.angle = Math.cos(cargo.phase) * 0.022;
+        this.hookX = cargo.x + cargo.width / 2;
+      }
+
+      release() {
+        if (this.mode !== 'playing' || this.cargo?.state !== 'hanging') return false;
+        this.cargo.state = 'falling';
+        this.cargo.angle = 0;
+        this.cargo.vy = 0;
+        this.hookRetract = 0;
+        this.onEvent({ type: 'release' });
+        return true;
+      }
+
+      addDebris(piece) {
+        if (piece.width <= 1) return;
+        if (this.debris.length >= 16) this.debris.shift();
+        this.debris.push({
+          ...piece, vx: piece.vx || 0, vy: -20,
+          angle: 0, rotation: (piece.vx < 0 ? -1 : 1) * (0.5 + this.random()), age: 0
+        });
+      }
+
+      impact(x, text, perfect) {
+        if (this.labels.length >= 6) this.labels.shift();
+        this.labels.push({ x, y: this.screenY(this.topY()) - 20, text, life: 1.15, perfect });
+        for (let i = 0; i < (perfect ? 14 : 7) && this.particles.length < 60; i++) {
+          const angle = this.random() * TAU;
+          this.particles.push({ x, y: this.screenY(this.topY()), vx: Math.cos(angle) * (30 + this.random() * 55), vy: Math.sin(angle) * 55 - 12, life: 0.35 + this.random() * 0.4, size: 2 + this.random() * 2, color: perfect ? '#ddc48b' : '#c5b995' });
+        }
+      }
+
+      land() {
+        const cargo = this.cargo, top = this.top();
+        const difference = cargo.x - top.x;
+        const perfect = Math.abs(difference) <= this.snapTolerance;
+        const left = perfect ? top.x : Math.max(cargo.x, top.x);
+        const right = perfect ? top.x + top.width : Math.min(cargo.x + cargo.width, top.x + top.width);
+        const supportedWidth = right - left;
+        cargo.y = this.topY();
+        if (supportedWidth < this.minimumWidth) {
+          this.lives--;
+          this.streak = 0;
+          this.shake = 5;
+          this.addDebris({ ...cargo, vx: difference < 0 ? -85 : 85 });
+          this.cargo = null;
+          this.nextDelay = 0.85;
+          this.onEvent({ type: 'miss', lives: this.lives });
+          if (this.lives === 0) {
+            this.mode = 'over';
+            this.saveBest();
+            this.onEvent({ type: 'over' });
+          }
+          return;
+        }
+
+        if (!perfect) {
+          this.addDebris({ ...cargo, x: cargo.x, width: left - cargo.x, vx: -60 });
+          this.addDebris({ ...cargo, x: right, width: cargo.x + cargo.width - right, vx: 60 });
+        }
+        const block = { id: cargo.id, x: left, y: cargo.y, width: supportedWidth, height: cargo.height, color: cargo.color };
+        this.stack.push(block);
+        if (this.stack.length > 40) this.stack.shift();
+        this.delivered++;
+        this.streak = perfect ? this.streak + 1 : 0;
+        if (perfect) this.perfects++;
+        const bonus = perfect ? 25 + Math.min(50, this.streak * 5) : 0;
+        const points = 10 + Math.round(supportedWidth / this.baseWidth * 10) + bonus;
+        this.score += points;
+        this.shake = perfect ? 1.5 : 2.5;
+        this.cargo = null;
+        this.nextDelay = 0.48;
+        this.impact(left + supportedWidth / 2, perfect ? `Точно! +${points}` : `+${points}`, perfect);
+        this.onEvent({ type: perfect ? 'perfect' : 'land', points, width: supportedWidth, streak: this.streak });
+      }
+
+      update(dt) {
+        if (this.mode !== 'playing' || !Number.isFinite(dt) || dt <= 0) return;
+        dt = Math.min(dt, 0.08);
+        this.time += dt;
+        this.shake = Math.max(0, this.shake - dt * 12);
+        const targetCamera = Math.max(0, this.topY() - this.cameraThreshold);
+        this.camera += (targetCamera - this.camera) * Math.min(1, dt * 5);
+        if (this.cargo?.state === 'hanging') {
+          const span = Math.min(this.baseWidth * 1.05, (this.width - this.cargo.width - 38) / 2);
+          const speed = this.baseWidth * (0.76 + 0.62 * (1 - Math.exp(-this.delivered / 26)));
+          this.cargo.phase += dt * speed / Math.max(30, span);
+          this.positionCargo();
+        } else if (this.cargo?.state === 'falling') {
+          this.hookRetract = Math.min(1, this.hookRetract + dt * 4);
+          this.cargo.vy += 960 * dt;
+          this.cargo.y -= this.cargo.vy * dt;
+          if (this.cargo.y <= this.topY()) this.land();
+          if (this.mode !== 'playing') return;
+        } else {
+          this.hookRetract = Math.min(1, this.hookRetract + dt * 4);
+          this.nextDelay -= dt;
+          if (this.nextDelay <= 0) this.spawnCargo();
+        }
+
+        for (const piece of this.debris) {
+          piece.x += piece.vx * dt;
+          piece.vy -= 800 * dt;
+          piece.y += piece.vy * dt;
+          piece.angle += piece.rotation * dt;
+          piece.age += dt;
+        }
+        this.debris = this.debris.filter(piece => piece.age < 3 && this.screenY(piece.y) < this.height + 130);
+        for (const particle of this.particles) {
+          particle.x += particle.vx * dt;
+          particle.y += particle.vy * dt;
+          particle.vy += 100 * dt;
+          particle.life -= dt;
+        }
+        this.particles = this.particles.filter(particle => particle.life > 0);
+        for (const label of this.labels) { label.y -= dt * 20; label.life -= dt; }
+        this.labels = this.labels.filter(label => label.life > 0);
+      }
+
+      getState() {
+        return {
+          mode: this.mode, time: this.time, score: this.score, delivered: this.delivered,
+          perfects: this.perfects, streak: this.streak, lives: this.lives, best: this.best,
+          width: this.top().width, minimumWidth: this.minimumWidth,
+          cargo: this.cargo ? { ...this.cargo } : null,
+          stack: this.stack.length, debris: this.debris.length, particles: this.particles.length
+        };
+      }
+    }
+
+    window.HarborGame = HarborGame;
+    const canvas = document.getElementById('harbor');
+    const context = canvas.getContext('2d', { alpha: false });
+    const $ = id => document.getElementById(id);
+    let bufferScale = 1;
+    let lastFrame = 0;
+    let nextHUD = 0;
+    let audio = null;
+    let sound = true;
+
+    function activateAudio() {
+      if (!sound) return;
+      try {
+        if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+        if (audio.state === 'suspended') audio.resume().catch(() => {});
+      } catch { audio = null; }
+    }
+
+    function tone(frequency, duration, end) {
+      if (!sound || !audio || audio.state !== 'running') return;
+      const oscillator = audio.createOscillator(), gain = audio.createGain();
+      const now = audio.currentTime;
+      oscillator.type = 'triangle';
+      oscillator.frequency.setValueAtTime(frequency, now);
+      oscillator.frequency.exponentialRampToValueAtTime(end, now + duration);
+      gain.gain.setValueAtTime(0.035, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      oscillator.connect(gain); gain.connect(audio.destination);
+      oscillator.start(now); oscillator.stop(now + duration + 0.01);
+    }
+
+    function setView(view) {
+      for (const name of ['menu', 'paused', 'over']) $(name).hidden = name !== view;
+      $('release').hidden = view !== null;
+      $('pause').setAttribute('aria-label', view === 'paused' ? 'Продолжить' : 'Пауза');
+    }
+
+    const game = new HarborGame({ onEvent(event) {
+      if (event.type === 'start' || event.type === 'resume') {
+        setView(null); activateAudio(); canvas.focus({ preventScroll: true });
+      }
+      if (event.type === 'pause') { setView('paused'); $('resume').focus({ preventScroll: true }); }
+      if (event.type === 'release') tone(320, 0.12, 160);
+      if (event.type === 'perfect') {
+        tone(460 + Math.min(6, game.streak) * 60, 0.23, 1050);
+      }
+      if (event.type === 'land') tone(140, 0.11, 85);
+      if (event.type === 'miss') tone(110, 0.3, 50);
+      if (event.type === 'over') {
+        setView('over');
+        $('final-score').textContent = game.score.toLocaleString('ru-RU');
+        $('final-height').textContent = game.delivered;
+        $('final-perfect').textContent = game.perfects;
+        $('final-best').textContent = `Рекорд · ${game.best.toLocaleString('ru-RU')}`;
+        $('again').focus({ preventScroll: true });
+      }
+      updateHUD();
+    } });
+    window.harborGame = game;
+
+    function updateHUD() {
+      $('score').textContent = game.score.toLocaleString('ru-RU');
+      $('height').textContent = game.delivered;
+      $('lives').textContent = '♥'.repeat(game.lives) + '♡'.repeat(3 - game.lives);
+      $('lives').setAttribute('aria-label', `${game.lives} попытки`);
+      $('release').disabled = game.cargo?.state !== 'hanging';
+    }
+
+    function resize() {
+      game.resize(window.innerWidth, window.innerHeight);
+      bufferScale = Math.min(1, 1200 / game.width, 800 / game.height);
+      canvas.width = Math.max(1, Math.round(game.width * bufferScale));
+      canvas.height = Math.max(1, Math.round(game.height * bufferScale));
+    }
+
+    function ellipse(x, y, rx, ry, fill, stroke) {
+      context.fillStyle = fill;
+      context.beginPath(); context.ellipse(x, y, rx, ry, 0, 0, TAU); context.fill();
+      if (stroke) { context.lineWidth = 1.5; context.strokeStyle = stroke; context.stroke(); }
+    }
+
+    function drawBackground(time) {
+      const w = game.width, h = game.height;
+      context.fillStyle = '#ebe7d5'; context.fillRect(0, 0, w, h);
+      const horizon = h * 0.67 + Math.min(35, game.camera * 0.025);
+      ellipse(w * 0.77, h * 0.22, 39, 39, '#e2cf9a');
+      context.fillStyle = '#e1e0cb';
+      for (let i = 0; i < 8; i++) {
+        const x = (i * 211 + 37) % (w + 100) - 30;
+        const y = h * 0.18 + (i % 3) * 34;
+        context.beginPath(); context.ellipse(x, y, 52, 7, 0, 0, TAU); context.fill();
+      }
+      context.fillStyle = '#b4c1ac';
+      for (let i = 0; i < Math.ceil(w / 88); i++) {
+        const roof = 30 + (i * 17 % 41);
+        context.fillRect(i * 88 - 9, horizon - roof - 18, 73, roof + 20);
+        context.fillRect(i * 88 + 12, horizon - roof - 30, 20, 20);
+      }
+      context.fillStyle = '#cfceb3'; context.fillRect(0, horizon - 11, w, 20);
+      context.fillStyle = '#87a59a'; context.fillRect(0, horizon + 9, w, h - horizon);
+      context.fillStyle = '#547e7340'; context.fillRect(0, horizon + 9, w, 5);
+      context.lineCap = 'round';
+      for (let row = 0; row < 8; row++) {
+        const y = horizon + 26 + row * 27;
+        for (let i = 0; i < 5; i++) {
+          const x = (i * 239 + row * 91 + Math.sin(time * 0.25 + row) * 15) % (w + 100) - 50;
+          context.strokeStyle = row % 2 ? '#b9cbbb66' : '#628f8055'; context.lineWidth = 2;
+          context.beginPath(); context.moveTo(x, y); context.lineTo(x + 39 + i * 3, y); context.stroke();
+        }
+      }
+      // Small gull silhouettes keep the harbour quiet, even while the cargo moves.
+      for (let i = 0; i < 3; i++) {
+        const x = (w * 0.57 + i * 91 + time * (5 + i * 2)) % (w + 80) - 40;
+        const y = h * 0.25 + i * 32 + Math.sin(time * 0.8 + i) * 5;
+        context.strokeStyle = '#8eaa98'; context.lineWidth = 1.6;
+        context.beginPath(); context.moveTo(x - 8, y - 2); context.quadraticCurveTo(x - 3, y - 7, x, y); context.quadraticCurveTo(x + 3, y - 7, x + 8, y - 2); context.stroke();
+      }
+    }
+
+    function drawShip() {
+      const deck = game.screenY(0), w = game.width;
+      if (deck > game.height + 100) return;
+      const width = Math.min(w * 0.9, 700), left = w / 2 - width / 2;
+      ellipse(w / 2 + 5, deck + 91, width * 0.51, 16, '#4e79665c');
+      context.fillStyle = '#587e73'; context.strokeStyle = '#41685e'; context.lineWidth = 2;
+      context.beginPath(); context.moveTo(left, deck + 9); context.lineTo(left + width, deck + 9); context.lineTo(left + width - 48, deck + 76); context.quadraticCurveTo(left + width - 60, deck + 86, left + width - 90, deck + 86); context.lineTo(left + 45, deck + 86); context.lineTo(left + 16, deck + 61); context.closePath(); context.fill(); context.stroke();
+      context.strokeStyle = '#d1cba6'; context.lineWidth = 4;
+      context.beginPath(); context.moveTo(left + 11, deck + 17); context.lineTo(left + width - 9, deck + 17); context.stroke();
+      context.fillStyle = '#b17853'; context.fillRect(left + 22, deck + 64, width - 76, 9);
+      context.fillStyle = '#c7c5a6'; context.fillRect(left + 37, deck - 57, 68, 64);
+      context.fillStyle = '#e8dfbd'; context.fillRect(left + 29, deck - 69, 85, 16);
+      context.fillStyle = '#758f80';
+      for (let i = 0; i < 3; i++) context.fillRect(left + 44 + i * 19, deck - 46, 13, 13);
+      context.fillStyle = '#8f9a7d'; context.fillRect(left + 56, deck - 86, 13, 17);
+      context.fillStyle = '#a56d4d'; context.fillRect(left + 53, deck - 90, 19, 6);
+      context.fillStyle = '#e8dfbd'; context.font = 'bold 11px Georgia,serif'; context.textAlign = 'right'; context.fillText('ТИХИЙ ХОД', left + width - 61, deck + 47);
+      context.fillStyle = '#a5966f'; context.fillRect(left + 8, deck - 1, width - 20, 9);
+      context.strokeStyle = '#7c8b71'; context.lineWidth = 1.2;
+      for (let x = left + 16; x < left + width - 17; x += 24) {
+        context.beginPath(); context.moveTo(x, deck - 10); context.lineTo(x, deck); context.stroke();
+      }
+      context.beginPath(); context.moveTo(left + 16, deck - 10); context.lineTo(left + width - 25, deck - 10); context.stroke();
+    }
+
+    function drawCrane() {
+      const w = game.width, h = game.height, top = game.trackY;
+      const left = Math.max(25, w * 0.075), right = w - Math.max(25, w * 0.075);
+      context.fillStyle = '#bb9b5f';
+      context.fillRect(left - 10, top - 9, 17, h - top + 10);
+      context.fillRect(right - 7, top - 9, 14, h - top + 10);
+      context.fillStyle = '#a88b53'; context.fillRect(left - 4, top, 4, h);
+      context.strokeStyle = '#cfb578'; context.lineWidth = 3;
+      for (let y = top + 18; y < h; y += 68) {
+        context.beginPath(); context.moveTo(left - 7, y); context.lineTo(left + 4, y + 52); context.moveTo(right - 4, y); context.lineTo(right + 4, y + 52); context.stroke();
+      }
+      context.fillStyle = '#c4a365'; context.fillRect(left - 16, top - 14, right - left + 32, 22);
+      context.fillStyle = '#9f8450'; context.fillRect(left - 16, top + 4, right - left + 32, 5);
+      context.strokeStyle = '#e0cb92'; context.lineWidth = 2;
+      for (let x = left; x < right - 20; x += 42) {
+        context.beginPath(); context.moveTo(x, top - 9); context.lineTo(x + 21, top + 1); context.lineTo(x + 42, top - 9); context.stroke();
+      }
+      const cargo = game.cargo;
+      let ropeBottom = top + 41;
+      if (cargo) {
+        const cargoTop = game.screenY(cargo.y + cargo.height) - 30;
+        ropeBottom = cargo.state === 'hanging' ? cargoTop : cargoTop + (top + 41 - cargoTop) * game.hookRetract;
+      }
+      ropeBottom = Math.max(top + 28, ropeBottom);
+      const x = game.hookX;
+      context.fillStyle = '#52776a'; context.fillRect(x - 21, top + 4, 42, 15);
+      context.fillStyle = '#385f53'; context.fillRect(x - 25, top + 1, 10, 7); context.fillRect(x + 15, top + 1, 10, 7);
+      context.strokeStyle = '#617d68'; context.lineWidth = 1.6;
+      context.beginPath(); context.moveTo(x - 8, top + 19); context.lineTo(x - 8, ropeBottom); context.moveTo(x + 8, top + 19); context.lineTo(x + 8, ropeBottom); context.stroke();
+      context.fillStyle = '#bd9158'; context.fillRect(x - 12, ropeBottom - 1, 24, 10);
+      context.strokeStyle = '#476456'; context.lineWidth = 3;
+      context.beginPath(); context.moveTo(x, ropeBottom + 9); context.quadraticCurveTo(x - 7, ropeBottom + 19, x + 2, ropeBottom + 21); context.quadraticCurveTo(x + 8, ropeBottom + 20, x + 6, ropeBottom + 15); context.stroke();
+      if (cargo?.state === 'hanging') {
+        const y = game.screenY(cargo.y + cargo.height);
+        context.strokeStyle = '#68806a'; context.lineWidth = 1.4;
+        context.beginPath(); context.moveTo(x, ropeBottom + 11); context.lineTo(cargo.x + 7, y + 2); context.moveTo(x, ropeBottom + 11); context.lineTo(cargo.x + cargo.width - 7, y + 2); context.stroke();
+      }
+    }
+
+    function drawContainer(block, time, fragment = false) {
+      const y = game.screenY(block.y + block.height);
+      if (y > game.height + 120 || y + block.height < -80) return;
+      const colors = CONTAINER_COLORS[block.color % CONTAINER_COLORS.length];
+      const width = block.width, height = block.height;
+      context.save(); context.translate(block.x + width / 2, y + height / 2); context.rotate(block.angle || 0);
+      context.fillStyle = colors.body; context.strokeStyle = colors.dark; context.lineWidth = 1.4;
+      context.fillRect(-width / 2, -height / 2, width, height); context.strokeRect(-width / 2, -height / 2, width, height);
+      context.fillStyle = colors.light; context.fillRect(-width / 2 + 2, -height / 2 + 2, Math.max(0, width - 4), 3);
+      context.fillStyle = colors.dark; context.globalAlpha = 0.45; context.fillRect(-width / 2 + 2, height / 2 - 5, Math.max(0, width - 4), 3); context.globalAlpha = 1;
+      const panels = Math.max(1, Math.floor(width / 24));
+      for (let i = 1; i < panels; i++) {
+        const x = -width / 2 + width * i / panels;
+        context.strokeStyle = colors.dark; context.lineWidth = 2;
+        context.beginPath(); context.moveTo(x, -height / 2 + 6); context.lineTo(x, height / 2 - 7); context.stroke();
+        context.strokeStyle = colors.light; context.lineWidth = 1;
+        context.beginPath(); context.moveTo(x + 2, -height / 2 + 6); context.lineTo(x + 2, height / 2 - 7); context.stroke();
+      }
+      if (width > 70 && !fragment) {
+        context.fillStyle = '#f3e5bc'; context.font = `bold ${Math.min(10, height * 0.22)}px "Trebuchet MS",sans-serif`; context.textAlign = 'left'; context.textBaseline = 'middle';
+        context.fillText(`HBR ${String(block.id + 17).padStart(3, '0')}`, -width / 2 + 11, 1);
+        context.strokeStyle = '#efdcb16b'; context.lineWidth = 1;
+        context.strokeRect(width / 2 - 24, -height / 2 + 9, 13, height - 18);
+      }
+      context.restore();
+    }
+
+    function draw(time) {
+      context.setTransform(bufferScale, 0, 0, bufferScale, 0, 0);
+      drawBackground(time);
+      context.save();
+      const shake = game.mode === 'playing' ? game.shake : 0;
+      context.translate(Math.sin(time * 47) * shake * 0.4, Math.cos(time * 55) * shake * 0.25);
+      drawCrane();
+      drawShip();
+      for (const block of game.stack) drawContainer(block, time);
+      for (const piece of game.debris) drawContainer(piece, time, true);
+      if (game.cargo) {
+        const y = game.screenY(game.topY());
+        const left = Math.max(game.cargo.x, game.top().x);
+        const right = Math.min(game.cargo.x + game.cargo.width, game.top().x + game.top().width);
+        if (right > left && game.cargo.state === 'hanging') {
+          context.fillStyle = '#f7e7af99'; context.fillRect(left, y - 4, right - left, 4);
+        }
+        drawContainer(game.cargo, time);
+      }
+      for (const particle of game.particles) {
+        context.globalAlpha = Math.min(1, particle.life * 2);
+        ellipse(particle.x, particle.y, particle.size, particle.size * 0.7, particle.color);
+      }
+      context.globalAlpha = 1;
+      context.textAlign = 'center'; context.textBaseline = 'middle';
+      for (const label of game.labels) {
+        context.globalAlpha = Math.min(1, label.life * 2);
+        context.font = `${label.perfect ? 'bold 18' : 'bold 15'}px "Trebuchet MS",sans-serif`;
+        context.lineWidth = 4; context.strokeStyle = '#eeead4'; context.strokeText(label.text, label.x, label.y);
+        context.fillStyle = label.perfect ? '#8f7140' : '#54796b'; context.fillText(label.text, label.x, label.y);
+      }
+      context.globalAlpha = 1;
+      context.restore();
+    }
+
+    function frame(time) {
+      if (!lastFrame || time - lastFrame >= 1000 / 30 - 0.8) {
+        const dt = lastFrame ? Math.min(0.08, (time - lastFrame) / 1000) : 0;
+        lastFrame = time;
+        game.update(dt); draw(time / 1000);
+        if (time >= nextHUD) { updateHUD(); nextHUD = time + 90; }
+      }
+      requestAnimationFrame(frame);
+    }
+
+    async function fullscreen() {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await document.documentElement.requestFullscreen();
+      } catch {}
+    }
+
+    function start() { activateAudio(); lastFrame = 0; game.start(); }
+    for (const id of ['start', 'restart', 'again']) $(id).addEventListener('click', start);
+    $('resume').addEventListener('click', () => { lastFrame = 0; game.resume(); });
+    $('pause').addEventListener('click', () => game.togglePause());
+    $('fullscreen').hidden = !document.fullscreenEnabled;
+    $('fullscreen').addEventListener('click', fullscreen);
+    $('sound').addEventListener('change', event => { sound = event.target.checked; if (sound) activateAudio(); });
+    $('release').addEventListener('pointerdown', event => { event.preventDefault(); game.release(); canvas.focus({ preventScroll: true }); });
+    canvas.addEventListener('pointerdown', event => { if (game.mode === 'playing') { event.preventDefault(); game.release(); canvas.focus({ preventScroll: true }); } });
+    window.addEventListener('keydown', event => {
+      if (event.repeat) return;
+      if (event.code === 'Escape' || event.code === 'KeyP') { event.preventDefault(); game.togglePause(); return; }
+      if (event.code === 'KeyF') { event.preventDefault(); fullscreen(); return; }
+      if (event.code === 'Space' && game.mode === 'playing') {
+        if (/^(BUTTON|INPUT)$/.test(event.target?.tagName || '')) return;
+        event.preventDefault(); game.release();
+      }
+    });
+    window.addEventListener('blur', () => game.pause());
+    document.addEventListener('visibilitychange', () => { if (document.hidden) game.pause(); });
+    window.addEventListener('resize', resize);
+    resize(); updateHUD();
+    $('menu-best').textContent = game.best ? `Твой рекорд · ${game.best.toLocaleString('ru-RU')}` : 'Первый рейс ещё впереди';
+    requestAnimationFrame(frame);
+  })();
+  </script>
+</body>
+</html>
